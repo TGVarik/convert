@@ -1,3 +1,9 @@
 *.log
 *.pyc
 config.py
+.DS_Store
+.idea/
+deluge
+venv/
+venv2/
+wtf.py
