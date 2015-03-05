@@ -22,9 +22,9 @@ tmdb.API_KEY = config['tmdb']
 plex_tv_section_folder = config['plex_tv_section']
 oldmp4_folder = config['oldmp4_folder']
 plex_movie_section_folder = config['plex_movie_section']
-# plex_tv_section_folder = '/Volumes/ark/Plex/TV Shows'
+plex_tv_section_folder = '/Volumes/Artemis/Plex/TV Shows'
 # oldmp4_folder = '/Volumes/ark/oldmp4'
-# plex_movie_section_folder = '/Volumes/ark/Plex/Movies/'
+plex_movie_section_folder = '/Volumes/Artemis/Plex/Movies/'
 
 def check_exists(folder, file):
   if os.path.exists(os.path.join(folder, file)) and os.path.isfile(os.path.join(folder, file)):
@@ -44,7 +44,7 @@ def check_exists(folder, file):
       with Timer('Moving to oldmp4'):
         os.rename(os.path.join(folder, file), os.path.join(oldmp4_folder, file))
 
-def process_movie(file_path, tmdb_id, collection=None, crop=False, special_feature_title=None, special_feature_type=None):
+def process_movie(file_path, tmdb_id, collection=None, crop=False, special_feature_title=None, special_feature_type=None, tag_only=False):
   log = LoggerAdapter(getLogger(), {'identifier': os.path.basename(file_path)[:10]})
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
     log.debug('TMDB ID: {:d}'.format(tmdb_id))
@@ -69,23 +69,24 @@ def process_movie(file_path, tmdb_id, collection=None, crop=False, special_featu
     if not os.path.exists(destination_folder):
       os.makedirs(destination_folder)
     check_exists(destination_folder, destination_filename)
-    with Cleaner(title) as c:
+    with Cleaner(title, temp_dir='/Volumes/Artemis/temp/') as c:
       target = file_path
       with Timer('Processing') as t:
         with FfMpeg(target, c) as n:
-          with Timer('Analyzing'):
-            n.analyze()
-          if n.needs_aac_to_ac3_conversion:
-            with Timer('Converting multichannel AAC to AC3'):
-              n._multichannel_aac_to_ac3()
-          if crop:
-            with Timer('Measuring video for autocrop'):
-              n.autocrop()
-              n.autoscale()
-          with Timer('Measuring volume'):
-            n._multichannel_measure()
-          with Timer('Converting'):
-            n._convert_and_normalize()
+          if not tag_only:
+            with Timer('Analyzing'):
+              n.analyze()
+            # if n.needs_aac_to_ac3_conversion:
+            #   with Timer('Converting multichannel AAC to AC3'):
+            #     n._multichannel_aac_to_ac3()
+            # if crop:
+            #   with Timer('Measuring video for autocrop'):
+            #     n.autocrop()
+            #     n.autoscale()
+            # with Timer('Measuring volume'):
+            #   n._multichannel_measure()
+            with Timer('Converting'):
+              n._convert_and_normalize()
           if special_feature_title is None and special_feature_type is None:
             with Timer('Tagging'):
               n.tag_movie(tmdb_id, collection)
@@ -99,7 +100,7 @@ def process_movie(file_path, tmdb_id, collection=None, crop=False, special_featu
     refresh_plex(source_type='movie')
 
 
-def process_tv(file_path, show_id, season_number, episode_number, crop=False, eng_only=True):
+def process_tv(file_path, show_id, season_number, episode_number, crop=False, keep_other_audio=False, deint=False):
   id = '{:05d}{:02d}{:03d}'.format(show_id, season_number, episode_number)
   log = LoggerAdapter(getLogger(), {'identifier': id})
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
@@ -130,18 +131,20 @@ def process_tv(file_path, show_id, season_number, episode_number, crop=False, en
       with Timer('Processing', id) as t:
         with FfMpeg(target, c, id) as n:
           with Timer('Analyzing', id):
-            n.analyze(eng_only)
-          if n.needs_aac_to_ac3_conversion:
-            with Timer('Converting multichannel AAC to AC3', id):
-              n._multichannel_aac_to_ac3()
-          if crop:
-            with Timer('Measuring video for autocrop', id):
-              n.autocrop()
-              n.autoscale()
-          with Timer('Measuring volume', id):
-            n._multichannel_measure()
+            n.analyze(crop=crop, keep_other_audio=keep_other_audio)
+          #with Timer('Checking interlacing', id):
+            # n.detect_interlacing()
+          # if n.needs_aac_to_ac3_conversion:
+          #   with Timer('Converting multichannel AAC to AC3', id):
+          #     n._multichannel_aac_to_ac3()
+          # if crop:
+          #   with Timer('Measuring video for autocrop', id):
+          #     n.autocrop()
+          #     n.autoscale()
+          # with Timer('Measuring volume', id):
+          #   n._multichannel_measure()
           with Timer('Converting', id):
-            n._convert_and_normalize()
+            n._convert_and_normalize(deinterlace=deint)
           with Timer('Tagging', id):
             n.tag_tv(show_id, season_number, episode_number)
           with Timer('Verifying faststart', id):
@@ -153,8 +156,15 @@ def process_tv(file_path, show_id, season_number, episode_number, crop=False, en
     log.info('Processing complete')
     refresh_plex(source_type='show')
 
+def lotr():
+  file = '/Volumes/Artemis/LOTR/The Lord of the Rings The Return of the King (2003).mp4'
+  if os.path.exists(file):
+    process_movie(file, 122, collection='The Lord of the Rings', crop=False, tag_only=True)
+  else:
+    print('file doesn\'t exist')
+
 def main_movies():
-  folder = '/Volumes/Agamemnon/movies/'
+  folder = '/Volumes/Artemis/LOTR'
   searcher = re.compile(r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)(-(?P<feature_type>behindthescenes|deleted|interview|scene|trailer))?$')
   files = []
   for root, dirs, fs in os.walk(folder):
@@ -164,18 +174,19 @@ def main_movies():
   for f in files:
     match = searcher.search(os.path.splitext(os.path.basename(f))[0])
     if match:
-      if match.groups('feature_type') is not None:
+      if match.group('feature_type') is not None:
         process_movie(f, int(match.group('tmdb_id')), collection=match.group('collection'), crop=True, special_feature_title=match.group('title'), special_feature_type=match.group('feature_type'))
+        # print('feature_type is not None: {:s}'.format(match.group('feature_type')))
       else:
-        process_movie(f, int(match.group('tmdb_id')), collection=match.group('collection'), crop=True)
+        process_movie(f, int(match.group('tmdb_id')), collection=match.group('collection'), crop=False, tag_only=True)
       move(f, f + '.done')
     else:
       log.error('Movie filename does not match pattern')
 
 
 def main():
-  folder = u'/media/storage/deluge/finished/Lexx/'
-  searcher = re.compile(r's(?P<season>\d\d)xe(?P<episode>\d\d)', re.I)
+  folder = u'/Volumes/storage/deluge/finished/House Of Cards - Complete Season 2 720p/'
+  searcher = re.compile(r's(?P<season>\d\d)e(?P<episode>\d\d)', re.I)
   #searcher = re.compile(r'(?P<season>\d)x(?P<episode>\d\d)', re.I)
   #searcher = re.compile(r'^(?P<season>\d)(?P<episode>\d\d)')
   files = []
@@ -189,7 +200,7 @@ def main():
     # searcher = re.compile(r's(?:eason\s)(?P<season>\d\d?)\s?e(?:pisode\s)(?P<episode>\d\d?)', re.I)
     match = searcher.search(os.path.basename(f))
     if match:
-      process_tv(f, 72854, int(match.group('season')), int(match.group('episode')), True)
+      process_tv(f, 262980, int(match.group('season')), int(match.group('episode')))
       move(f, f + '.done')
       #print '{:{width}s}: S{:02d}E{:02d}'.format(os.path.basename(f), int(match.group('season')), int(match.group('episode')), width=maxlen)
     #else:

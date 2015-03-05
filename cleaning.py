@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-from tempfile import gettempdir
+import tempfile
 from logging import getLogger, LoggerAdapter
 from email.mime.text import MIMEText
 from smtplib import SMTP
@@ -21,9 +21,11 @@ def pushover(s, m, fail=False):
       Client(user_key=k).send_message(m, title=s)
 
 class Cleaner(object):
-  def __init__(self, ref, id=None):
+  def __init__(self, ref, id=None, temp_dir=None):
+    if temp_dir:
+      tempfile.tempdir = temp_dir
     self._temp_files = []
-    self.temp_dir = gettempdir()
+    self.temp_dir = tempfile.gettempdir()
     self._ref = ref
     self._log = getLogger()
     self._id = id
