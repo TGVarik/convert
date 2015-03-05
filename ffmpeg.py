@@ -18,7 +18,6 @@ from logging import getLogger, LoggerAdapter
 from config import config
 from datetime import datetime
 from requests.exceptions import Timeout
-from operator import itemgetter
 
 from qtfaststart import processor as qt
 
@@ -78,12 +77,12 @@ def _fix_crop(match, max_height=720.0):
   return scaled
 
 class FfMpeg(object):
-  def __init__(self, path, cleaner=None, id=None):
-    if os.path.exists(path) and os.path.isfile(path):
-      self.in_file = path
+  def __init__(self, filepath, cleaner=None, ident=None):
+    if os.path.exists(filepath) and os.path.isfile(filepath):
+      self.in_file = filepath
     self.log = getLogger()
-    if id:
-      self.log = LoggerAdapter(self.log, {'identifier': id})
+    if ident:
+      self.log = LoggerAdapter(self.log, {'identifier': ident})
     if cleaner is None:
       from tempfile import gettempdir
       class NullCleaner(object):
@@ -126,9 +125,9 @@ class FfMpeg(object):
           if err:
             raise Exception(err.decode())
           self.current_file_info = _all_keys_to_lowercase(json.loads(out))
-          self.video_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'video' and s['codec_name'] != 'mjpeg'], key=lambda s: s['index'])
-          self.audio_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'audio'], key=lambda s: s['index'])
-          self.subtitle_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'subtitle'], key=lambda s: s['index'])
+          self.video_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'video' and s['codec_name'] != 'mjpeg'], key=lambda st: st['index'])
+          self.audio_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'audio'], key=lambda st: st['index'])
+          self.subtitle_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'subtitle'], key=lambda st: st['index'])
           self.log.debug('Has video: {:d}, audio: {:d}, subtitle: {:d}'.format(len(self.video_streams), len(self.audio_streams), len(self.subtitle_streams)))
 
   def _analyze_audio(self, keep_others=False):
@@ -165,7 +164,7 @@ class FfMpeg(object):
       if 'language' not in stream['tags']:
         stream['tags']['language'] = 'eng'
     self._multichannel_measure()
-    self.audio_streams = sorted(self.audio_streams, key=lambda s: (-s['_default'], s['index']))
+    self.audio_streams = sorted(self.audio_streams, key=lambda st: (-st['_default'], st['index']))
 
   def _analyze_crop_and_scale(self, max_height=720.0):
     matches = []
@@ -202,7 +201,7 @@ class FfMpeg(object):
       _, err = p.communicate()
       found = [m.groupdict() for m in r.finditer(err.decode('latin-1'))]
       matches.extend(found)
-    match = {k: int(v) for k,v in max(matches, key=lambda m:(int(m['width']), int(m['height']))).items()}
+    match = {k: int(v) for k,v in max(matches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
     scaled = _fix_crop(match, max_height=max_height)
     crop = match['height'] < self.default_video_stream['height'] or match['width'] < self.default_video_stream['width']
     scale = scaled['width'] < match['width'] or scaled['height'] < match['height']
@@ -225,7 +224,7 @@ class FfMpeg(object):
       raise Exception('No video streams detected!')
     elif len(self.video_streams) > 1:
       self.log.warning('More than one video stream')
-      h264_streams = sorted([s for s in self.video_streams if s['codec_name'] == 'h264'], key=lambda s: s['index'])
+      h264_streams = sorted([s for s in self.video_streams if s['codec_name'] == 'h264'], key=lambda st: st['index'])
       if len(h264_streams) > 0:
         self.log.debug('Using first h264 stream, ignoring others')
         self.default_video_stream = h264_streams[0]
@@ -494,14 +493,14 @@ class FfMpeg(object):
     p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     _, err = p.communicate()
     matches = [m.groupdict() for m in re.finditer(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS', err.decode('latin-1'))]
-    matches.sort(key=lambda m: int(m['position'], 16))
+    matches.sort(key=lambda ma: int(ma['position'], 16))
     for n in range(0, len(matches)):
       stream = [s for s in self.audio_streams if s['_measure'] == True][n]
       stream['_loudness'] = float(matches[n]['loudness'])
       self.log.info('Stream {:d} had loudness {: >+5.1f}dB'.format(stream['index'], stream['_loudness']))
     return self
 
-  def _convert_and_normalize(self, deinterlace=False):
+  def convert_and_normalize(self, deinterlace=False):
     cmd = ['ffmpeg', '-hide_banner', '-stats', '-y', '-v', 'quiet']
     inputs = []
     maps = []
@@ -693,18 +692,18 @@ class FfMpeg(object):
       try:
         movie = tmdb.Movies(tmdb_id)
         info = movie.info()
-        credits = movie.credits()
+        cred = movie.credits()
         releases = movie.releases()
       except Timeout as e:
         if i < 3:
-          self.log.warn('Unable to connect to TMDB, retrying ({:d} of 3'.format(i+1))
+          self.log.warning('Unable to connect to TMDB, retrying ({:d} of 3'.format(i+1))
           continue
         else:
-          self.log.fatal('Unable to connect to TMDB after 3 retries')
+          self.log.critical('Unable to connect to TMDB after 3 retries')
           raise e
       break
-    cast = credits['cast']
-    crew = credits['crew']
+    cast = cred['cast']
+    crew = cred['crew']
     release_date = datetime.strptime(info['release_date'], '%Y-%m-%d') if 'release_date' in info and info['release_date'] != '' else None
     # Buid the plist
     plist = {}
@@ -728,8 +727,7 @@ class FfMpeg(object):
     if plist != {}:
       plist_string = _plist_to_string(plist)
     # Build the parsley dict
-    parsley = {}
-    parsley['stik'] = u'Movie'
+    parsley = {'stik': u'Movie'}
     if plist_string is not None:
       parsley['rDNSatom'] = {'name': 'iTunMOVI', 'domain': 'com.apple.iTunes', 'value': plist_string}
     if 'countries' in releases and len(releases['countries']) > 0:
@@ -748,9 +746,9 @@ class FfMpeg(object):
     if release_date is not None:
       parsley['year'] = release_date.strftime('%Y-%m-%d')
     if 'tagline' in info and info['tagline'] != '':
-      parsley['description'] = _join_and_ellipsize(re.sub('\/', '', info['tagline']).split(' '), ' ', 255)
+      parsley['description'] = _join_and_ellipsize(re.sub('/', '', info['tagline']).split(' '), ' ', 255)
     if 'overview' in info and info['overview'] != '':
-      parsley['longdesc'] = re.sub('\/', '', info['overview'])
+      parsley['longdesc'] = re.sub('/', '', info['overview'])
     if self.video_streams[0]['height'] > 720 or self.video_streams[0]['width'] > 1280:
       parsley['hdvideo'] = 2
     elif self.video_streams[0]['height'] > 480 or self.video_streams[0]['height'] > 854:
@@ -776,10 +774,10 @@ class FfMpeg(object):
         episode = show[season_num][episode_num]
       except tvdb_error as e:
         if i < 3:
-          self.log.warn('Unable to connect to TVDB, retrying ({:d} of 3)'.format(i+1))
+          self.log.warning('Unable to connect to TVDB, retrying ({:d} of 3)'.format(i+1))
           continue
         else:
-          self.log.fatal('Unable to connect to TVDB after 3 retries')
+          self.log.critical('Unable to connect to TVDB after 3 retries')
           raise e
       break
     # Build the plist
@@ -796,12 +794,7 @@ class FfMpeg(object):
     if plist != {}:
       plist_string = _plist_to_string(plist)
     # Build the parsley dict
-    parsley = {}
-    parsley['stik'] = u'TV Show'
-    parsley['track'] = episode_num
-    parsley['TVEpisodeNum'] = episode_num
-    parsley['TVSeasonNum'] = season_num
-    parsley['disk'] = 0
+    parsley = {'stik': u'TV Show', 'track': episode_num, 'TVEpisodeNum': episode_num, 'TVSeasonNum': season_num, 'disk': 0}
     if plist_string is not None:
       parsley['rDNSatom'] = {'name': 'iTunMOVI', 'domain': 'com.apple.iTunes', 'value': plist_string}
     if 'contentrating' in show.data and show.data['contentrating'] is not None:

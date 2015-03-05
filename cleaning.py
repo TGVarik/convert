@@ -21,16 +21,16 @@ def pushover(s, m, fail=False):
       Client(user_key=k).send_message(m, title=s)
 
 class Cleaner(object):
-  def __init__(self, ref, id=None, temp_dir=None):
+  def __init__(self, ref, ident=None, temp_dir=None):
     if temp_dir:
       tempfile.tempdir = temp_dir
     self._temp_files = []
     self.temp_dir = tempfile.gettempdir()
     self._ref = ref
     self._log = getLogger()
-    self._id = id
-    if id:
-      self._log = LoggerAdapter(self._log, {'identifier': id})
+    self._id = ident
+    if ident:
+      self._log = LoggerAdapter(self._log, {'identifier': ident})
 
   def __enter__(self):
     return self
@@ -59,7 +59,7 @@ class Cleaner(object):
       con.ehlo()
       con.login(user=from_address, password=email_password)
       con.sendmail(from_addr=from_address, to_addrs=[to_address], msg=msg.as_string())
-    except Exception as e:
+    except Exception:
       self._log.error('Sending failmail failed! Logging message...')
       self._log.error(subject)
       self._log.error(body)

@@ -12,7 +12,7 @@ def setup_logging(name):
   logger.setLevel(DEBUG)
   fh = FileHandler('{:s}.log'.format(name))
   fh.setLevel(DEBUG)
-  fm = CustomFormatter('{asctime:s} {identifier:11s}[ {levelname:^8s} ]:{msg:s}')
+  fm = CustomFormatter('{asctime:s} {identifier:14s}[ {levelname:^8s} ]:{msg:s}')
   fh.setFormatter(fm)
   fh.addFilter(LogFilter())
   logger.addHandler(fh)
@@ -26,12 +26,9 @@ class LogFilter(Filter):
 
 
 class CustomFormatter(Formatter):
-  def __init__(self, fmt=None, datefmt=None):
-    super(CustomFormatter, self).__init__()
-    if fmt:
-      self._fmt = fmt
-    else:
-      self._fmt = '{message:s}'
+  def __init__(self, **kwargs):
+    super(CustomFormatter, self).__init__(**kwargs)
+    self._fmt = kwargs['fmt'] if 'fmt' in kwargs else '{message:s}'
   def formatTime(self, record, datefmt=None):
     ct = datetime.utcfromtimestamp(record.created).replace(tzinfo=pytz.UTC)
     lz = get_localzone()
@@ -51,8 +48,8 @@ class CustomFormatter(Formatter):
     identifier_index = fmt.find('{identifier')
     if identifier_index >= 0:
       if 'identifier' not in record.__dict__:
-        fmt = re.sub('\{identifier.*?\}','           ',fmt)
-    s = fmt.format(**(record.__dict__))
+        fmt = re.sub('\{identifier.*?\}','              ',fmt)
+    s = fmt.format(**record.__dict__)
     if record.exc_info:
       if not record.exc_text:
         record.exc_text = self.formatException(record.exc_info)

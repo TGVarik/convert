@@ -4,14 +4,14 @@ from time import time
 from logging import getLogger, LoggerAdapter
 
 class Timer:
-  def __init__(self, action, id=None):
+  def __init__(self, action, ident=None):
     self.start = None
     self.end = None
     self.interval = None
     self.action = action
     self.log = getLogger()
-    if id:
-      self.log = LoggerAdapter(self.log, {'identifier': id})
+    if ident:
+      self.log = LoggerAdapter(self.log, {'identifier': ident})
 
   def __enter__(self):
     self.log.debug(self.action + '...')
