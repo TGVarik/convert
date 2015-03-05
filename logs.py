@@ -12,7 +12,7 @@ def setup_logging(name):
   logger.setLevel(DEBUG)
   fh = FileHandler('{:s}.log'.format(name))
   fh.setLevel(DEBUG)
-  fm = CustomFormatter('{asctime:s} {identifier:14s}[ {levelname:^8s} ]:{msg:s}')
+  fm = CustomFormatter(fmt='{asctime:s} {identifier:14s}[ {levelname:^8s} ]:{msg:s}')
   fh.setFormatter(fm)
   fh.addFilter(LogFilter())
   logger.addHandler(fh)
