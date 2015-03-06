@@ -146,14 +146,14 @@ class FfMpeg(object):
       self.needs_aac_to_ac3_conversion = True
     default['_default'] = True
     default['_measure'] = True
-    default['_copy'] = True if default['codec_name'] in ['ac3', 'dca'] else False
+    default['_copy'] = False if default['codec_name'] in ['aac', 'libfdk_aac'] and default['channels'] > 2 else True
     default['_convert'] = False if default['codec_name'] in ['aac', 'libfdk_aac'] and default['channels'] <= 2 else True
     self.default_audio_stream = default
     for stream in self.audio_streams:
       if '_default' not in stream:
         stream['_default'] = False
       if '_measure' not in stream:
-        stream['_measure'] = True if keep_others and stream['codec_name'] in ['aac', 'libfdk_aac'] else False
+        stream['_measure'] = True if keep_others and stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] <= 2 else False
       if '_copy' not in stream:
         stream['_copy'] = True if keep_others else False
       if '_convert' not in stream:
@@ -169,11 +169,12 @@ class FfMpeg(object):
       self._measure_loudness()
 
   def _analyze_crop_scale_deint(self, crop, max_height, deint):
+    tolerance = 4
     cropmatches = []
     deintmatches = []
     filters = []
     rcrop = re.compile(r'crop=(?P<width>\d+):(?P<height>\d+):(?P<x>\d+):(?P<y>\d+)\D', re.I)
-    rdeint = re.compile(r'Multi\sframe\sdetection:\sTFF:\s?(?P<tff>\d+)\sBFF:\s?(?P<bff>\d+)\sProgressive:\s?(?P<pro>\d+)\sUndetermined:\s?(?P<und>\d+)', re.I)
+    rdeint = re.compile(r'Multi\sframe\sdetection:\sTFF:\s*(?P<tff>\d+)\sBFF:\s*(?P<bff>\d+)\sProgressive:\s*(?P<pro>\d+)\sUndetermined:\s*(?P<und>\d+)', re.I)
     if deint:
       filters.append('idet')
     if crop:
@@ -220,7 +221,7 @@ class FfMpeg(object):
           deintmatches.extend(found)
     if crop:
       match = {k: int(v) for k,v in max(cropmatches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
-    else:
+    if (not crop) or (crop and abs(self.default_video_stream['width'] - match['width']) <= tolerance and abs(self.default_video_stream['height'] - match['height']) <= tolerance):
       match = {'width': self.default_video_stream['width'],
                'height': self.default_video_stream['height'],
                'x': 0,
@@ -232,14 +233,15 @@ class FfMpeg(object):
         'Progressive': sum([int(m['pro']) for m in deintmatches]),
         'Undetermined': sum([int(m['und']) for m in deintmatches])
       }
-      frames = float(sum(deint_data.values()))
-      deint_data = {k: float(v) / frames for k, v in deint_data.items()}
-      frameorder, pct = max(deint_data.items(), key=lambda x:x[1])
-      if frameorder in ['TFF', 'BFF', 'Progressive'] and pct >= 0.95:
-        self.default_video_stream['_frameorder'] = frameorder
+      totalframes = float(sum(deint_data.values()))
+      detectedframes = float(sum([v for k,v in deint_data.items() if k != 'Undetermined']))
+      deint_data = {k: [float(v) / totalframes, float(v)/detectedframes] for k, v in deint_data.items()}
+      fieldorder, pct = max(deint_data.items(), key=lambda x:x[1][0])
+      if fieldorder in ['TFF', 'BFF', 'Progressive'] and pct[0] >= 0.75 and pct[1] >= 0.95:
+        self.default_video_stream['_fieldorder'] = fieldorder
       else:
-        self.default_video_stream['_frameorder'] = 'Undetermined'
-      self.log.info('Field order is: {:s}'.format(self.default_video_stream['_frameorder']))
+        self.default_video_stream['_fieldorder'] = 'Undetermined'
+      self.log.info('Field order is: {:s}'.format(self.default_video_stream['_fieldorder']))
     scaled = _fix_crop(match, max_height=max_height)
     crop = crop and (match['height'] < self.default_video_stream['height'] or match['width'] < self.default_video_stream['width'])
     scale = scaled['width'] < match['width'] or scaled['height'] < match['height']
@@ -481,7 +483,7 @@ class FfMpeg(object):
     cmd.extend(converts)
     dest = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'norm', 'mp4']))
     cmd.extend(['-f', 'mp4', dest])
-    self.log.debug(cmd)
+    self.log.debug(_command_to_string(cmd))
     p = call(cmd)
     if p != 0:
       raise IOError('Normalization failed with exit code {:d}'.format(p))
