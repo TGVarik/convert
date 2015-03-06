@@ -169,7 +169,7 @@ class FfMpeg(object):
       self._measure_loudness()
 
   def _analyze_crop_scale_deint(self, crop, max_height, deint):
-    tolerance = 4
+    tolerance = 8
     cropmatches = []
     deintmatches = []
     filters = []
