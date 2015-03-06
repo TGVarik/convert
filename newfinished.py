@@ -228,16 +228,17 @@ def on_connect_fail(result):
   outerlog.error('Failed to connect to daemon - {}'.format(repr(result)))
   reactor.stop()
 
+tvdb_api_key = config['tvdb']
+tmdb.API_KEY = config['tmdb']
+plex_tv_section = config['plex_tv_section']
+oldmp4_folder = config['oldmp4_folder']
+plex_movie_section = config['plex_movie_section']
+rarfile.NEED_COMMENTS = 0
+setup_logging('/var/log/deluge/finished')
+outerlog = getLogger()
+temp_folder = gettempdir()
+
 if __name__ == '__main__':
-  tvdb_api_key = config['tvdb']
-  tmdb.API_KEY = config['tmdb']
-  plex_tv_section = config['plex_tv_section']
-  oldmp4_folder = config['oldmp4_folder']
-  plex_movie_section = config['plex_movie_section']
-  rarfile.NEED_COMMENTS = 0
-  setup_logging('/var/log/deluge/finished')
-  outerlog = getLogger()
-  temp_folder = gettempdir()
   temp_files = []
   torrentId = argv[1]
   outerlog.info('finished.py called on {:s}'.format(argv[2]))
