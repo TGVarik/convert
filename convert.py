@@ -48,7 +48,7 @@ def main():
   for f in files:
     match = searcher.search(os.path.basename(f))
     if match:
-      process_tv(f, 257248, int(match.group('season')), int(match.group('episode')))
+      process_tv(f, 257248, int(match.group('season')), int(match.group('episode')), crop=True, deint=True)
       move(f, f + '.done')
     #else:
       #print os.path.basename(f) + ': did not match!'
