@@ -148,13 +148,13 @@ class FfMpeg(object):
     default['_default'] = True
     default['_measure'] = True
     default['_copy'] = True if default['codec_name'] in ['ac3', 'dca'] else False
-    default['_convert'] = True
+    default['_convert'] = False if default['codec_name'] in ['aac', 'libfdk_aac'] and default['channels'] <= 2 else True
     self.default_audio_stream = default
     for stream in self.audio_streams:
       if '_default' not in stream:
         stream['_default'] = False
       if '_measure' not in stream:
-        stream['_measure'] = True if keep_others else False
+        stream['_measure'] = True if keep_others and stream['codec_name'] in ['aac', 'libfdk_aac'] else False
       if '_copy' not in stream:
         stream['_copy'] = True if keep_others else False
       if '_convert' not in stream:
@@ -498,6 +498,8 @@ class FfMpeg(object):
       stream = [s for s in self.audio_streams if s['_measure'] == True][n]
       stream['_loudness'] = float(matches[n]['loudness'])
       self.log.info('Stream {:d} had loudness {: >+5.1f}dB'.format(stream['index'], stream['_loudness']))
+      if abs(-23 - stream['_loudness']) > 1:
+        stream['_convert'] = True
     return self
 
   def convert_and_normalize(self, deinterlace=False):
