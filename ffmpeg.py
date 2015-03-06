@@ -18,7 +18,6 @@ from logging import getLogger, LoggerAdapter
 from config import config
 from datetime import datetime
 from requests.exceptions import Timeout
-
 from qtfaststart import processor as qt
 
 tvdb_api_key = config['tvdb']
@@ -46,8 +45,8 @@ def _join_and_ellipsize(elements, joiner, max_length, ellipsis=u'…'):
     s = joiner.join(elements[:n]) + ellipsis
   return s
 
-def _get_scaled(w, h, mw=1280.0, mh=720.0):
-  if w > mw or h > mh:
+def _get_scaled(w, h, mw, mh):
+  if mw is not None and mh is not None and (w > mw or h > mh):
     ma = mw / mh
     a = float(w) / float(h)
     ow = mw if a >= ma else math.ceil(mh*a)
@@ -57,8 +56,8 @@ def _get_scaled(w, h, mw=1280.0, mh=720.0):
     oh = h
   return {'width': ow, 'height': oh}
 
-def _fix_crop(match, max_height=720.0):
-  max_width = max_height * 16.0 / 9.0
+def _fix_crop(match, max_height):
+  max_width = max_height * 16.0 / 9.0 if max_height is not None else None
   scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
   added = 0
   while scaled['width'] % 8 > 0 and scaled['width'] < max_width and match['x'] > 0:
@@ -130,7 +129,7 @@ class FfMpeg(object):
           self.subtitle_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'subtitle'], key=lambda st: st['index'])
           self.log.debug('Has video: {:d}, audio: {:d}, subtitle: {:d}'.format(len(self.video_streams), len(self.audio_streams), len(self.subtitle_streams)))
 
-  def _analyze_audio(self, keep_others=False):
+  def _analyze_audio(self, keep_others):
     if len(self.audio_streams) < 1:
       raise Exception('No audio streams detected!')
     default = [s for s in self.audio_streams if s['channels'] == max(self.audio_streams, key=lambda i:i['channels'])['channels']]
@@ -165,20 +164,46 @@ class FfMpeg(object):
         stream['tags']['language'] = 'eng'
       if stream['tags']['language'] == 'und':
         stream['tags']['language'] = 'eng'
-    self._multichannel_measure()
     self.audio_streams = sorted(self.audio_streams, key=lambda st: (-st['_default'], st['index']))
+    if any([s['_measure'] for s in self.audio_streams]):
+      self._measure_loudness()
 
-  def _analyze_crop_and_scale(self, max_height=720.0):
-    matches = []
-    r = re.compile(r'crop=(?P<width>\d+):(?P<height>\d+):(?P<x>\d+):(?P<y>\d+)\D')
-    n = int(math.floor(float(self.current_file_info['format']['duration']) / 240))
-    if n > 1:
-      for i in range(1,n):
+  def _analyze_crop_scale_deint(self, crop, max_height, deint):
+    cropmatches = []
+    deintmatches = []
+    filters = []
+    rcrop = re.compile(r'crop=(?P<width>\d+):(?P<height>\d+):(?P<x>\d+):(?P<y>\d+)\D', re.I)
+    rdeint = re.compile(r'Multi\sframe\sdetection:\sTFF:\s?(?P<tff>\d+)\sBFF:\s?(?P<bff>\d+)\sProgressive:\s?(?P<pro>\d+)\sUndetermined:\s?(?P<und>\d+)', re.I)
+    if deint:
+      filters.append('idet')
+    if crop:
+      filters.append('cropdetect=24:1:0')
+    if crop or deint:
+      n = int(math.floor(float(self.current_file_info['format']['duration']) / 240))
+      if n > 1:
+        for i in range(1,n):
+          cmd = ['ffmpeg',
+                 '-hide_banner',
+                 '-ss', str(240 * i),
+                 '-i', self.current_file,
+                 '-vframes', '20',
+                 '-map', '0:{:d}'.format(self.default_video_stream['index']),
+                 '-an',
+                 '-sn',
+                 '-vf:0', ','.join(filters),
+                 '-f', 'null',
+                 '-']
+          p = Popen(cmd, stdout=PIPE, stderr=PIPE)
+          _, err = p.communicate()
+          found = [m.groupdict() for m in rcrop.finditer(err.decode('latin-1'))]
+          cropmatches.extend(found)
+          if deint:
+            found = [m.groupdict() for m in rdeint.finditer(err.decode('latin-1'))]
+            deintmatches.extend(found)
+      else:
         cmd = ['ffmpeg',
                '-hide_banner',
-               '-ss', str(240 * i),
                '-i', self.current_file,
-               '-vframes', '20',
                '-map', '0:{:d}'.format(self.default_video_stream['index']),
                '-an',
                '-sn',
@@ -187,25 +212,36 @@ class FfMpeg(object):
                '-']
         p = Popen(cmd, stdout=PIPE, stderr=PIPE)
         _, err = p.communicate()
-        found = [m.groupdict() for m in r.finditer(err.decode('latin-1'))]
-        matches.extend(found)
+        if crop:
+          found = [m.groupdict() for m in rcrop.finditer(err.decode('latin-1'))]
+          cropmatches.extend(found)
+        if deint:
+          found = [m.groupdict() for m in rdeint.finditer(err.decode('latin-1'))]
+          deintmatches.extend(found)
+    if crop:
+      match = {k: int(v) for k,v in max(cropmatches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
     else:
-      cmd = ['ffmpeg',
-             '-hide_banner',
-             '-i', self.current_file,
-             '-map', '0:{:d}'.format(self.default_video_stream['index']),
-             '-an',
-             '-sn',
-             '-vf:0', 'cropdetect=24:1:0',
-             '-f', 'null',
-             '-']
-      p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-      _, err = p.communicate()
-      found = [m.groupdict() for m in r.finditer(err.decode('latin-1'))]
-      matches.extend(found)
-    match = {k: int(v) for k,v in max(matches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
+      match = {'width': self.default_video_stream['width'],
+               'height': self.default_video_stream['height'],
+               'x': 0,
+               'y': 0}
+    if deint:
+      deint_data = {
+        'TFF': sum([int(m['tff']) for m in deintmatches]),
+        'BFF': sum([int(m['bff']) for m in deintmatches]),
+        'Progressive': sum([int(m['pro']) for m in deintmatches]),
+        'Undetermined': sum([int(m['und']) for m in deintmatches])
+      }
+      frames = float(sum(deint_data.values()))
+      deint_data = {k: float(v) / frames for k, v in deint_data.items()}
+      frameorder, pct = max(deint_data.items(), key=lambda x:x[1])
+      if frameorder in ['TFF', 'BFF', 'Progressive'] and pct >= 0.95:
+        self.default_video_stream['_frameorder'] = frameorder
+      else:
+        self.default_video_stream['_frameorder'] = 'Undetermined'
+      self.log.info('Field order is: {:s}'.format(self.default_video_stream['_frameorder']))
     scaled = _fix_crop(match, max_height=max_height)
-    crop = match['height'] < self.default_video_stream['height'] or match['width'] < self.default_video_stream['width']
+    crop = crop and (match['height'] < self.default_video_stream['height'] or match['width'] < self.default_video_stream['width'])
     scale = scaled['width'] < match['width'] or scaled['height'] < match['height']
     if crop:
       self.default_video_stream['_crop'] = match
@@ -221,7 +257,7 @@ class FfMpeg(object):
         s += 'scale to {width:d}:{height:d}'.format(**scaled)
       self.log.info(s)
 
-  def _analyze_video(self, crop=True, max_height=720.0):
+  def _analyze_video(self, allow_crop, max_height, deint):
     if len(self.video_streams) < 1:
       raise Exception('No video streams detected!')
     elif len(self.video_streams) > 1:
@@ -235,220 +271,37 @@ class FfMpeg(object):
         self.default_video_stream = self.video_streams[0]
     else:
       self.default_video_stream = self.video_streams[0]
-    if crop:
-      self._analyze_crop_and_scale(max_height=max_height)
-    if self.default_video_stream['codec_name'] != 'h264' or '_crop' in self.default_video_stream or '_scale' in self.default_video_stream: # or self.video_streams[0]['height'] > 720:
-      self.default_video_stream['_convert'] = True
+    if allow_crop or deint or max_height is not None:
+      self._analyze_crop_scale_deint(crop=allow_crop, max_height=max_height, deint=deint)
+    vs = self.default_video_stream
+    if vs['codec_name'] != 'h264' or '_crop' in vs or '_scale' in vs or (deint and vs['_fieldorder'] in ['TFF', 'BFF']):
+      vs['_convert'] = True
     else:
-      self.default_video_stream['_convert'] = False
+      vs['_convert'] = False
 
-
-  def analyze(self, crop=True, max_height=720.0, keep_other_audio=False):
-    self._analyze_video(crop=crop, max_height=max_height)
+  def analyze(self, allow_crop=True, max_height=None, keep_other_audio=False, deint=False):
+    self._analyze_video(allow_crop=allow_crop, max_height=max_height, deint=deint)
     self._analyze_audio(keep_others=keep_other_audio)
-
-  # def crop(self, width, height, x, y):
-  #   vs = self.video_streams[0]
-  #   if vs['width'] > width or vs['height'] > height:
-  #     vs['_convert'] = True
-  #     vs['_crop'] = {'width': width, 'height': height, 'x': x, 'y': y}
-  #     self.log.debug('Will crop to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(vs['_crop'])))
-  #
-  #
-  #
-  #
-  # def autocrop(self, x_tolerance=4, y_tolerance=2):
-  #   matches = []
-  #   n = int(math.floor(float(self.current_file_info['format']['duration']) / 240))
-  #   if n > 1:
-  #     for i in range(1, int(math.floor(float(self.current_file_info['format']['duration']) / 240))):
-  #       cmd = ['ffmpeg', '-hide_banner', '-ss', str(240 * i), '-i', self.current_file, '-vframes', '20', '-an', '-sn', '-vf:0', 'cropdetect=24:2:0', '-f', 'null', '-']
-  #       p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-  #       _, err = p.communicate()
-  #       found = [m.groupdict() for m in re.finditer(r'crop=(?P<width>\d+):(?P<height>\d+):(?P<x>\d+):(?P<y>\d+)\D', err.decode('latin-1'))]
-  #       matches.extend(found)
-  #   else:
-  #     cmd = ['ffmpeg', '-hide_banner', '-i', self.current_file, '-an', '-sn', '-vf:0', 'cropdetect=24:2:0', '-f', 'null', '-']
-  #     p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-  #     _, err = p.communicate()
-  #     found = [m.groupdict() for m in re.finditer(r'crop=(?P<width>\d+):(?P<height>\d+):(?P<x>\d+):(?P<y>\d+)\D', err.decode('latin-1'))]
-  #     matches.extend(found)
-  #   match = sorted(matches, key=lambda mch: (int(mch['width']), int(mch['height'])), reverse=True)[0]
-  #   vs = self.video_streams[0]
-  #   if vs['width'] > int(match['width']) + x_tolerance or vs['height'] > int(match['height']) + y_tolerance:
-  #     vs['_convert'] = True
-  #     vs['_crop'] = {k: int(v) for k, v in match.items()}
-  #     self.log.debug('Will crop to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(vs['_crop'])))
-  #   return self
-  #
-  # def autoscale(self, max_height=720, tolerance=0):
-  #   max_width = int(max_height * 16 / 9)
-  #   vs = self.video_streams[0]
-  #   width = vs['width'] if '_crop' not in vs else vs['_crop']['width']
-  #   height = vs['height'] if '_crop' not in vs else vs['_crop']['height']
-  #   aspect = width / height
-  #   if height > max_height + tolerance or width > max_width + tolerance:
-  #     if aspect > 16/9:
-  #       new_width = max_width
-  #       new_height = max_width / aspect
-  #     elif aspect < 16/9:
-  #       new_height = max_height
-  #       new_width = max_height * aspect
-  #     else:
-  #       new_height = max_height
-  #       new_width = max_width
-  #     vs['_convert'] = True
-  #     vs['_scale'] = {'width': int(math.floor(new_width / 2) * 2), 'height': int(math.floor(new_height / 2) * 2)}
-  #     self.log.debug('Will scale to {width:d}:{height:d}'.format(**(vs['_scale'])))
-  #   return self
-
-  # def _convert_command(self, start=None, duration=None):
-  #   cmd = ['ffmpeg', '-hide_banner', '-stats', '-y', '-v', 'quiet']
-  #   inputs = ['-i', self.current_file]
-  #   if start is not None:
-  #     inputs.extend(['-ss', start])
-  #   if duration is not None:
-  #     inputs.extend(['-t', duration])
-  #   maps = []
-  #   converts = []
-  #   input_index = 0
-  #   video_index = 0
-  #   audio_index = 0
-  #   video_stream = self.video_streams[0]  # only taking one video stream for now
-  #   maps.extend(['-map', '0:{:d}'.format(video_stream['index'])])
-  #   if video_stream['_convert']:
-  #     filters = []
-  #     if '_crop' in video_stream:
-  #       filters.append('crop={:d}:{:d}:{:d}:{:d}'.format(video_stream['_crop']['width'], video_stream['_crop']['height'], video_stream['_crop']['x'], video_stream['_crop']['y']))
-  #     if '_scale' in video_stream:
-  #       filters.append('scale={:d}:{:d}'.format(video_stream['_scale']['width'], video_stream['_scale']['height']))
-  #     if len(filters) > 0:
-  #       converts.extend(['-vf:{:d}'.format(video_index), ','.join(filters)])
-  #     converts.extend(['-c:v:{:d}'.format(video_index), 'libx264', '-preset:v:{:d}'.format(video_index), 'fast', '-crf:v:{:d}'.format(video_index), '20'])
-  #   else:
-  #     converts.extend(['-c:v:{:d}'.format(video_index), 'copy'])
-  #   for stream in self.audio_streams:
-  #     if stream['_convert']:
-  #       if stream['channels'] > 2:
-  #         if input_index == 0:
-  #           inputs.extend(['-request_channels', '2', '-i', self.current_file])
-  #           input_index += 1
-  #         maps.extend(['-map', '{:d}:{:d}'.format(input_index, stream['index'])])
-  #       else:
-  #         maps.extend(['-map', '0:{:d}'.format(stream['index'])])
-  #       if stream['codec_name'] in ['aac', 'libfdk_aac']:
-  #         converts.extend(['-c:a:{:d}'.format(audio_index), 'aac', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
-  #       else:
-  #         converts.extend(['-c:a:{:d}'.format(audio_index), 'libfdk_aac', '-vbr:a:{:d}'.format(audio_index), '5', '-cutoff:a:{:d}'.format(audio_index), '20000', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
-  #       audio_index += 1
-  #     if stream['_action'] == 'copy':
-  #       maps.extend(['-map', '0:{:d}'.format(stream['index'])])
-  #       converts.extend(['-c:a:{:d}'.format(audio_index), 'copy', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
-  #       audio_index += 1
-  #   cmd.extend(inputs)
-  #   cmd.extend(maps)
-  #   cmd.extend(converts)
-  #   cmd.append('-sn')
-  #   return cmd
-  #
-  # def convert(self):
-  #   cmd = self._convert_command()
-  #   dest = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'conv', 'mp4']))
-  #   cmd.extend(['-f', 'mp4', dest])
-  #   self.log.debug('calling ffmpeg')
-  #   self.log.debug(_command_to_string(cmd))
-  #   p = call(cmd)
-  #   if p != 0:
-  #     raise IOError('Conversion failed with exit code {:d}'.format(p))
-  #   self.cleaner.add_path(dest)
-  #   self._refresh(dest)
-  #   return self
-
-  # def _multichannel_aac_to_ac3(self):
-  #   if any([s['channels'] > 2 and s['codec_name'] in ['aac', 'libfdk_aac'] for s in self.audio_streams]):
-  #     cmd = ['ffmpeg', '-hide_banner', '-v', 'quiet', '-stats', '-y', '-i', self.current_file]
-  #     maps = []
-  #     codecs = []
-  #     video_index = 0
-  #     audio_index = 0
-  #     subtitle_index = 0
-  #     for stream in self.video_streams:
-  #       maps.extend(['-map', '0:{:d}'.format(stream['index'])])
-  #       codecs.extend(['-codec:v:{:d}'.format(video_index), 'copy'])
-  #       video_index += 1
-  #     for stream in self.audio_streams:
-  #       maps.extend(['-map', '0:{:d}'.format(stream['index'])])
-  #       if stream['channels'] > 2 and stream['codec_name'] in ['aac', 'libfdk_aac']:
-  #         codecs.extend(['-codec:a:{:d}'.format(audio_index), 'ac3'])
-  #       else:
-  #         codecs.extend(['-codec:a:{:d}'.format(audio_index), 'copy'])
-  #       audio_index += 1
-  #     for stream in self.subtitle_streams:
-  #       maps.extend(['-map', '0:{:d}'.format(stream['index'])])
-  #       codecs.extend(['-codec:s:{:d}'.format(subtitle_index), 'copy'])
-  #       subtitle_index += 1
-  #     cmd.extend(maps)
-  #     cmd.extend(codecs)
-  #     dest = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'ac3', self.current_file_ext]))
-  #     cmd.append(dest)
-  #     self.log.debug(cmd)
-  #     p = call(cmd)
-  #     if p != 0:
-  #       raise IOError('Converting multichannel AAC to AC3 failed with exit code {:d}'.format(p))
-  #     self.cleaner.add_path(dest)
-  #     self._refresh(dest)
-  #     self.analyze()
-  #   return self
-  #
-  # def _measure_loudness(self):
-  #   cmd = ['ffmpeg', '-hide_banner', '-stats', '-i', self.current_file]
-  #   maps = []
-  #   filters = []
-  #   audio_stream_counter = 0
-  #   aac_streams = [s for s in self.audio_streams if s['codec_name'] in ['aac', 'libfdk_aac']]
-  #   for stream in aac_streams:
-  #     maps.extend(['-map', '0:{:d}'.format(stream['index'])])
-  #     filters.extend(['-filter:a:{:d}'.format(audio_stream_counter), 'ebur128'])
-  #     audio_stream_counter += 1
-  #   cmd.extend(maps)
-  #   cmd.extend(filters)
-  #   cmd.extend(['-f', 'null', '-'])
-  #   self.log.debug(_command_to_string(cmd))
-  #   p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-  #   _, err = p.communicate()
-  #   matches = [m.groupdict() for m in re.finditer(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS', err.decode())]
-  #   matches.sort(key=lambda m: int(m['position'], 16))
-  #   if len(aac_streams) != len(matches):
-  #     self.log.error('Whoops!')
-  #     raise Exception('Whoops!')
-  #   for n in range(0, len(matches)):
-  #     stream = aac_streams[n]
-  #     match = matches[n]
-  #     stream['_loudness'] = float(match['loudness'])
-  #     self.log.info('Stream {:d} has loudness {: >+5.1f}dB'.format(stream['index'], stream['_loudness']))
 
   def _build_aac_to_ac3_pipeline(self):
     aac_multi_streams = 0
-    c = []
-    if self.needs_aac_to_ac3_conversion:
-      extracmd = ['ffmpeg', '-hide_banner', '-v', 'quiet', '-i', self.current_file]
-      extramaps = []
-      extraconverts = []
-      audio_index = 0
-      for stream in [stream for stream in self.audio_streams if stream['_measure'] == True]:
-        if stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] > 2:
-          aac_multi_streams += 1
-          extramaps.extend(['-map', '0:{:d}'.format(stream['index'])])
-          extraconverts.extend(['-c:a:{:d}'.format(audio_index), 'ac3'])
-      if len(extramaps) > 0:
-        extraconverts.extend(['-vn', '-sn'])
-        extracmd.extend(extramaps)
-        extracmd.extend(extraconverts)
-        extracmd.extend(['-f', 'ac3', '-'])
-        c.extend(extracmd)
-    return c
+    cmd = ['ffmpeg', '-hide_banner', '-v', 'quiet', '-i', self.current_file]
+    maps = []
+    converts = []
+    audio_index = 0
+    for stream in [stream for stream in self.audio_streams if stream['_measure'] == True]:
+      if stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] > 2:
+        aac_multi_streams += 1
+        maps.extend(['-map', '0:{:d}'.format(stream['index'])])
+        converts.extend(['-c:a:{:d}'.format(audio_index), 'ac3'])
+    if len(maps) > 0:
+      converts.extend(['-vn', '-sn'])
+      cmd.extend(maps)
+      cmd.extend(converts)
+      cmd.extend(['-f', 'ac3', '-'])
+    return cmd
 
-  def _multichannel_measure(self):
+  def _measure_loudness(self):
     cmd = ['ffmpeg', '-hide_banner', '-stats']
     inputs = []
     maps = []
@@ -461,13 +314,12 @@ class FfMpeg(object):
       if stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] > 2:
         if input_indices['aac_to_ac3'] is None:
           pre = self._build_aac_to_ac3_pipeline()
-          if len(pre) > 0:
-            pre.append('|')
-            pre.extend(cmd)
-            cmd = pre
-            inputs.extend(['-f', 'ac3', '-request_channels', '2', '-i', '-'])
-            input_indices['aac_to_ac3'] = input_count
-            input_count += 1
+          pre.append('|')
+          pre.extend(cmd)
+          cmd = pre
+          inputs.extend(['-f', 'ac3', '-request_channels', '2', '-i', '-'])
+          input_indices['aac_to_ac3'] = input_count
+          input_count += 1
         maps.extend(['-map', '{:d}:{:d}'.format(input_indices['aac_to_ac3'], aac_to_ac3_audio_index)])
         filters.extend(['-filter:a:{:d}'.format(audio_index), 'ebur128'])
         aac_to_ac3_audio_index += 1
@@ -499,12 +351,16 @@ class FfMpeg(object):
     for n in range(0, len(matches)):
       stream = [s for s in self.audio_streams if s['_measure'] == True][n]
       stream['_loudness'] = float(matches[n]['loudness'])
-      self.log.info('Stream {:d} had loudness {: >+5.1f}dB'.format(stream['index'], stream['_loudness']))
+      self.log.info('Stream {:d} had loudness {:.1f}dB'.format(stream['index'], stream['_loudness']))
       if abs(-23 - stream['_loudness']) > 1:
-        stream['_convert'] = True
+        stream['_gain'] = abs(-23 - stream['_loudness'])
+        self.log.info('Stream {:d} needs {:+.1f}dB of gain'.format(stream['index'], stream['_gain']))
+        if stream['_copy'] and stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] <= 2:
+          stream['_convert'] = True
+          stream['_copy'] = False
     return self
 
-  def convert_and_normalize(self, deinterlace=False):
+  def convert_and_normalize(self):
     cmd = ['ffmpeg', '-hide_banner', '-stats', '-y', '-v', 'quiet']
     inputs = []
     maps = []
@@ -514,18 +370,17 @@ class FfMpeg(object):
     input_indices = {'main': None, 'aac_to_ac3': None, 'request_channels': None, 'aac_request_channels': None}
     aac_to_ac3_audio_index = 0
     audio_index = 0
-
-
+### Video
     if input_indices['main'] is None:
       inputs.extend(['-i', self.current_file])
       input_indices['main'] = input_count
       input_count += 1
     maps.extend(['-map', '{:d}:{:d}'.format(input_indices['main'], self.default_video_stream['index'])])
-    if self.default_video_stream['_convert'] == True or deinterlace:
+    if self.default_video_stream['_convert']:
       f = []
-      if deinterlace:
+      if '_fieldorder' in self.default_video_stream and self.default_video_stream['_fieldorder'] in ['TFF', 'BFF']:
         f.append('idet')
-        f.append('yadif=deint=interlaced')
+        f.append('yadif=0:{:d}:1'.format(0 if self.default_video_stream['_fieldorder'] == 'TFF' else 1))
       if '_crop' in self.default_video_stream:
         f.append('crop={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_crop'])))
       if '_scale' in self.default_video_stream:
@@ -535,8 +390,7 @@ class FfMpeg(object):
       converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '20'])
     else:
       converts.extend(['-c:v:0', 'copy'])
-
-
+### Audio
     for stream in self.audio_streams:
       if stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] > 2:
         if stream['_copy']:
@@ -618,12 +472,15 @@ class FfMpeg(object):
               filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}'.format(delta)])
           converts.extend(['-c:a:{:d}'.format(audio_index), 'libfdk_aac', '-vbr:a:{:d}'.format(audio_index), '5', '-cutoff:a:{:d}'.format(audio_index), '20000', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
           audio_index += 1
+### Subtitle
+    converts.append('-sn')
+### Final
     cmd.extend(inputs)
     cmd.extend(maps)
     cmd.extend(filters)
     cmd.extend(converts)
     dest = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'norm', 'mp4']))
-    cmd.extend(['-sn', '-f', 'mp4', dest])
+    cmd.extend(['-f', 'mp4', dest])
     self.log.debug(cmd)
     p = call(cmd)
     if p != 0:
@@ -631,50 +488,6 @@ class FfMpeg(object):
     self.cleaner.add_path(dest)
     self._refresh(dest)
     return self
-
-  #
-  # def normalize(self):
-  #   self._measure_loudness()
-  #   video_stream_counter = 0
-  #   audio_stream_counter = 0
-  #   subtitle_stream_counter = 0
-  #   cmd = ['ffmpeg', '-v', 'quiet', '-hide_banner', '-stats', '-y', '-i', self.current_file]
-  #   maps = []
-  #   converts = []
-  #   for video_stream in self.video_streams:
-  #     maps.extend(['-map', '0:{:d}'.format(video_stream['index'])])
-  #     converts.extend(['-c:v:{:d}'.format(video_stream_counter), 'copy'])
-  #     video_stream_counter += 1
-  #   for audio_stream in self.audio_streams:
-  #     maps.extend(['-map', '0:{:d}'.format(audio_stream['index'])])
-  #     if audio_stream['codec_name'] in ['aac', 'libfdk_aac']:
-  #       gain = -23.0 - audio_stream['_loudness']
-  #     else:
-  #       gain = 0
-  #     if abs(gain) > 0.5:
-  #       self.log.debug('Stream {:d} needs {: >+5.1f}dB of gain'.format(audio_stream['index'], gain))
-  #       converts.extend(['-c:a:{:d}'.format(audio_stream_counter), 'libfdk_aac' if audio_stream['codec_name'] in ['aac', 'libfdk_aac'] else audio_stream['codec_name'], '-filter:a:{:d}'.format(audio_stream_counter), 'volume={:.1f}dB'.format(gain)])
-  #       audio_stream_counter += 1
-  #     else:
-  #       self.log.debug('Stream {:d} needs {: >+5.1f}dB of gain'.format(audio_stream['index'], 0.0))
-  #       converts.extend(['-c:a:{:d}'.format(audio_stream_counter), 'copy'])
-  #       audio_stream_counter += 1
-  #   for subtitle_stream in self.subtitle_streams:
-  #     maps.extend(['-map', '0:{:d}'.format(subtitle_stream['index'])])
-  #     converts.extend(['-c:s:{:d}'.format(subtitle_stream_counter), 'mov_text'])
-  #     subtitle_stream_counter += 1
-  #   cmd.extend(maps)
-  #   cmd.extend(converts)
-  #   normalized_file = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'norm', 'mp4']))
-  #   cmd.extend(['-f', 'mp4', normalized_file])
-  #   self.log.debug('Adjusting volume')
-  #   self.log.debug(_command_to_string(cmd))
-  #   p = call(cmd)
-  #   if p != 0:
-  #     raise IOError('Normalization failed with exit code {:d}'.format(p))
-  #   self.cleaner.add_path(normalized_file)
-  #   self._refresh(normalized_file)
-  #   return self
 
   def _garnish(self, parsley):
     tagged_file = os.path.join(self.cleaner.temp_dir, u'.'.join([self.current_file_basename, 'tagged', self.current_file_ext]))
