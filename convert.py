@@ -17,15 +17,6 @@ from cleaning import Cleaner
 from config import config
 from newfinished import process_movie, process_tv
 
-log = None
-tvdb_api_key = config['tvdb']
-tmdb.API_KEY = config['tmdb']
-plex_tv_section_folder = config['plex_tv_section']
-oldmp4_folder = config['oldmp4_folder']
-plex_movie_section_folder = config['plex_movie_section']
-#plex_tv_section_folder = '/Volumes/Artemis/Plex/TV Shows'
-# oldmp4_folder = '/Volumes/ark/oldmp4'
-#plex_movie_section_folder = '/Volumes/Artemis/Plex/Movies/'
 
 def main_movies():
   folder = '/Volumes/Artemis/LOTR'
@@ -63,7 +54,6 @@ def main():
       #print os.path.basename(f) + ': did not match!'
       #log.error('Couldn\'t find identifier in file name')
 
-
 def retag_tv():
   folder = '/media/aristotle/retag/'
   show_id = 72116
@@ -80,7 +70,7 @@ def retag_tv():
         episode_number = int(match.group('episode'))
         log.debug('Show ID: {:d}, Season: {:d}, Episode: {:d}'.format(show_id, season_number, episode_number))
         illegal_chars = re.compile(r'[\\/:"*?<>|]')
-        tvdb = Tvdb(apikey=tvdb_api_key, language='en', banners=True, actors=True)
+        tvdb = Tvdb(apikey=config['tvdb'], language='en', banners=True, actors=True)
         show = tvdb[show_id]
         show_name = show['seriesname']
         log.debug('Show name: {:s}'.format(show_name))
@@ -93,27 +83,27 @@ def retag_tv():
           log.debug('Episode name: {:s}'.format(episode_name))
           episode_name_safe = ' '.join(illegal_chars.sub(repl=' ', string=episode_name).split())
           log.debug('Safe episode name: {:s}'.format(episode_name_safe))
-          destination_folder = os.path.join(plex_tv_section_folder, show_name_safe, 'Specials' if season_number == 0 else 'Season {:d}'.format(season_number))
+          destination_folder = os.path.join(config['plex_tv_section'], show_name_safe, 'Specials' if season_number == 0 else 'Season {:d}'.format(season_number))
           destination_filename = '{:s} - S{:02d}E{:02d} - {:s}.mp4'.format(show_name_safe, season_number, episode_number, episode_name_safe)
           log.info('Destination path: {:s}'.format(os.path.join(destination_folder, destination_filename)))
           if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
           if os.path.exists(os.path.join(destination_folder, destination_filename)) and os.path.isfile(os.path.join(destination_folder, destination_filename)):
             log.debug('Destination file already exists!')
-            if os.path.exists(os.path.join(oldmp4_folder, destination_filename)):
+            if os.path.exists(os.path.join(config['oldmp4_folder'], destination_filename)):
               log.debug('File already exists in oldmp4')
               with Timer('Comparing files'):
-                res = cmp(os.path.join(oldmp4_folder, destination_filename), os.path.join(destination_folder, destination_filename))
+                res = cmp(os.path.join(config['oldmp4_folder'], destination_filename), os.path.join(destination_folder, destination_filename))
               if res:
                 log.debug('Files are identical, deleting Plex copy')
                 os.remove(os.path.join(destination_folder, destination_filename))
               else:
                 log.debug('Files are different')
                 with Timer('Renameing to timestamped backup in oldmp4'):
-                  os.rename(os.path.join(destination_folder, destination_filename), os.path.join(oldmp4_folder, datetime.utcnow().strftime('%Y%m%dT%H%M%SZ-') + destination_filename))
+                  os.rename(os.path.join(destination_folder, destination_filename), os.path.join(config['oldmp4_folder'], datetime.utcnow().strftime('%Y%m%dT%H%M%SZ-') + destination_filename))
             else:
               with Timer('Moving to oldmp4'):
-                os.rename(os.path.join(destination_folder, destination_filename), os.path.join(oldmp4_folder, destination_filename))
+                os.rename(os.path.join(destination_folder, destination_filename), os.path.join(config['oldmp4_folder'], destination_filename))
           target = f
           with Timer('Processing') as t:
             with FfMpeg(target, c) as n:
@@ -128,8 +118,8 @@ def retag_tv():
         refresh_plex(source_type='show')
         move(f, f + '.done')
 
-
 if __name__ == '__main__':
+  tmdb.API_KEY = config['tmdb']
   from logs import setup_logging
   setup_logging('convert')
   log = getLogger()
