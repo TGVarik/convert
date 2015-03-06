@@ -53,7 +53,7 @@ class Cleaner(object):
       msg['From'] = from_address
       msg['To'] = to_address
       con = SMTP()
-      con.set_debuglevel(1)
+      # con.set_debuglevel(1)
       con.connect('smtp.mail.me.com', 587)
       con.starttls()
       con.ehlo()
@@ -68,14 +68,16 @@ class Cleaner(object):
         con.close()
 
   def __exit__(self, exc_type, exc_val, exc_tb):
+
+    if exc_val is not None:
+      self._log.error('{:s}: {:s}'.format(exc_type, exc_val))
+      self.send_failmail(self._ref, ''.join(format_exception(exc_type, exc_val, exc_tb)))
+      pushover(self._ref, 'An error of type {:s} occurred: {}'.format(exc_type.__name__, exc_val), True)
+      print_exception(exc_type, exc_val, exc_tb)
     if len(self._temp_files) > 0:
       with Timer('Cleaning up', self._id):
         for f in self._temp_files:
           if os.path.exists(f):
             self._log.debug('Deleting temp file {:s}'.format(f))
             os.remove(f)
-    if exc_val is not None:
-      self.send_failmail(self._ref, ''.join(format_exception(exc_type, exc_val, exc_tb)))
-      pushover(self._ref, 'An error of type {:s} occurred: {}'.format(exc_type.__name__, exc_val), True)
-      print_exception(exc_type, exc_val, exc_tb)
     return False
