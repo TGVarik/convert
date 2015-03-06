@@ -48,24 +48,17 @@ def main_movies():
       log.error('Movie filename does not match pattern')
 
 def main():
-  folder = u'/Volumes/storage/deluge/finished/House Of Cards - Complete Season 2 720p/'
+  folder = u'/media/storage/deluge/finished/Major Crimes - The Complete Season 1 [HDTV]/'
   searcher = re.compile(r's(?P<season>\d\d)e(?P<episode>\d\d)', re.I)
-  #searcher = re.compile(r'(?P<season>\d)x(?P<episode>\d\d)', re.I)
-  #searcher = re.compile(r'^(?P<season>\d)(?P<episode>\d\d)')
   files = []
   for root, dirs, fs in os.walk(folder):
     files.extend([os.path.join(root, f) for f in fs if os.path.splitext(f)[1].lower() in ['.mkv', '.mp4', '.avi']])
-  #files = glob(os.path.join(folder, '*.mp4'))
-  #files = sorted(files, key=lambda f:int(searcher.search(os.path.basename(f)).group('episode')))
   print('{:d} files found.'.format(len(files)))
   for f in files:
-    # searcher = re.compile(r'[sS](?P<season>\d\d)[eE](?P<episode>\d\d)')
-    # searcher = re.compile(r's(?:eason\s)(?P<season>\d\d?)\s?e(?:pisode\s)(?P<episode>\d\d?)', re.I)
     match = searcher.search(os.path.basename(f))
     if match:
-      process_tv(f, 262980, int(match.group('season')), int(match.group('episode')))
+      process_tv(f, 257248, int(match.group('season')), int(match.group('episode')))
       move(f, f + '.done')
-      #print '{:{width}s}: S{:02d}E{:02d}'.format(os.path.basename(f), int(match.group('season')), int(match.group('episode')), width=maxlen)
     #else:
       #print os.path.basename(f) + ': did not match!'
       #log.error('Couldn\'t find identifier in file name')

@@ -2,6 +2,7 @@
 *.pyc
 config.py
 .DS_Store
+.pytrakt.json
 .idea/
 deluge
 venv/

@@ -93,7 +93,7 @@ def process_tv(file_path, show_id, season_number, episode_number, crop=False, ke
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
     log.debug('Show ID: {:d}, Season: {:d}, Episode: {:d}'.format(show_id, season_number, episode_number))
     illegal_chars = re.compile(r'[\\/:"*?<>|]')
-    tvdb = Tvdb(apikey=tvdb_api_key, language='en', banners=True, actors=True)
+    tvdb = Tvdb(apikey=config['tvdb'], language='en', banners=True, actors=True)
     show = tvdb[show_id]
     show_name = show['seriesname']
     log.debug('Show name: {:s}'.format(show_name))
