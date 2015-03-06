@@ -163,6 +163,8 @@ class FfMpeg(object):
         stream['tags'] = {}
       if 'language' not in stream['tags']:
         stream['tags']['language'] = 'eng'
+      if stream['tags']['language'] == 'und':
+        stream['tags']['language'] = 'eng'
     self._multichannel_measure()
     self.audio_streams = sorted(self.audio_streams, key=lambda st: (-st['_default'], st['index']))
 
