@@ -194,6 +194,7 @@ class FfMpeg(object):
                  '-vf:0', ','.join(filters),
                  '-f', 'null',
                  '-']
+          self.log.debug(_command_to_string(cmd))
           p = Popen(cmd, stdout=PIPE, stderr=PIPE)
           _, err = p.communicate()
           found = [m.groupdict() for m in rcrop.finditer(err.decode('latin-1'))]
@@ -211,6 +212,7 @@ class FfMpeg(object):
                '-vf:0', 'cropdetect=24:1:0',
                '-f', 'null',
                '-']
+        self.log.debug(_command_to_string(cmd))
         p = Popen(cmd, stdout=PIPE, stderr=PIPE)
         _, err = p.communicate()
         if crop:
@@ -346,6 +348,7 @@ class FfMpeg(object):
     cmd.extend(maps)
     cmd.extend(filters)
     cmd.extend(['-f', 'null', '-'])
+    self.log.debug(_command_to_string(cmd))
     p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     _, err = p.communicate()
     matches = [m.groupdict() for m in re.finditer(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS', err.decode('latin-1'))]
@@ -499,7 +502,7 @@ class FfMpeg(object):
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
       else:
         cmd.extend(['--{:s}'.format(key), unicode(value).encode('utf-8')])
-    self.log.debug(cmd)
+    self.log.debug(_command_to_string(cmd))
     p = call(cmd)
     if p != 0:
       raise IOError('Tagging failed with exit code {:d}'.format(p))
