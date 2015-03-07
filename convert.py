@@ -39,7 +39,7 @@ def main_movies():
       log.error('Movie filename does not match pattern')
 
 def main():
-  folder = u'/media/storage/deluge/finished/Major Crimes - The Complete Season 1 [HDTV]/'
+  folder = u'/media/storage/deluge/finished/Vikings Season 1 Bluray/'
   searcher = re.compile(r's(?P<season>\d\d)e(?P<episode>\d\d)', re.I)
   files = []
   for root, dirs, fs in os.walk(folder):
@@ -48,7 +48,7 @@ def main():
   for f in files:
     match = searcher.search(os.path.basename(f))
     if match:
-      process_tv(f, 257248, int(match.group('season')), int(match.group('episode')), crop=True, deint=True)
+      process_tv(f, 260449, int(match.group('season')), int(match.group('episode')), crop=False, deint=False, max_height=None)
       move(f, f + '.done')
     #else:
       #print os.path.basename(f) + ': did not match!'
