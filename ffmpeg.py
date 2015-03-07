@@ -447,11 +447,8 @@ class FfMpeg(object):
             input_indices['request_channels'] = input_count
             input_count += 1
           maps.extend(['-map', '{:d}:{:d}'.format(input_indices['request_channels'], stream['index'])])
-          if '_loudness' in stream:
-            delta = -23 - stream['_loudness']
-            if abs(delta) > 1:
-              self.log.info('Stream {:d} needs {:.1f}dB of gain'.format(stream['index'], delta))
-              filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}'.format(delta)])
+          if '_gain' in stream:
+            filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}dB'.format(stream['_gain'])])
           converts.extend(['-c:a:{:d}'.format(audio_index), 'libfdk_aac', '-vbr:a:{:d}'.format(audio_index), '5', '-cutoff:a:{:d}'.format(audio_index), '20000', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
           audio_index += 1
       else:
@@ -469,11 +466,8 @@ class FfMpeg(object):
             input_indices['main'] = input_count
             input_count += 1
           maps.extend(['-map', '{:d}:{:d}'.format(input_indices['main'], stream['index'])])
-          if '_loudness' in stream:
-            delta = -23 - stream['_loudness']
-            if abs(delta) > 1:
-              self.log.info('Stream {:d} needs {:.1f}dB of gain'.format(stream['index'], delta))
-              filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}'.format(delta)])
+          if '_gain' in stream:
+            filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}dB'.format(stream['gain'])])
           converts.extend(['-c:a:{:d}'.format(audio_index), 'libfdk_aac', '-vbr:a:{:d}'.format(audio_index), '5', '-cutoff:a:{:d}'.format(audio_index), '20000', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
           audio_index += 1
 ### Subtitle
