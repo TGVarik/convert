@@ -24,12 +24,14 @@ tvdb_api_key = config['tvdb']
 tmdb.API_KEY = config['tmdb']
 
 def _plist_to_string(root_object):
-  return dumps(root_object)
+  return dumps(root_object).decode('utf-8')
 
 def _command_to_string(command):
   if not isinstance(command, list):
     raise Exception('command_to_string takes a list, not a {:s}!'.format(type(command).__name__))
-  return ' '.join(["'{:s}'".format(s.decode('latin-1')) if ' ' in s else s.decode('latin-1') for s in command])
+  l = ["'{:s}'".format(s) if ' ' in s else s for s in command]
+  result = re.sub('[\n\t]+', '', ' '.join(l))
+  return result
 
 def _all_keys_to_lowercase(d):
   if isinstance(d, list):
@@ -498,7 +500,7 @@ class FfMpeg(object):
       if key == 'rDNSatom':
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
       else:
-        cmd.extend(['--{:s}'.format(key), unicode(value).encode('utf-8')])
+        cmd.extend(['--{:s}'.format(key), value])
     self.log.debug(_command_to_string(cmd))
     p = call(cmd)
     if p != 0:
@@ -613,14 +615,14 @@ class FfMpeg(object):
     if plist != {}:
       plist_string = _plist_to_string(plist)
     # Build the parsley dict
-    parsley = {'stik': u'TV Show', 'track': episode_num, 'TVEpisodeNum': episode_num, 'TVSeasonNum': season_num, 'disk': 0}
+    parsley = {'stik': u'TV Show', 'track': unicode(episode_num), 'TVEpisodeNum': unicode(episode_num), 'TVSeasonNum': unicode(season_num), 'disk': '0'}
     if plist_string is not None:
       parsley['rDNSatom'] = {'name': 'iTunMOVI', 'domain': 'com.apple.iTunes', 'value': plist_string}
     if 'contentrating' in show.data and show.data['contentrating'] is not None:
       parsley['contentRating'] = show['contentrating']
     if 'episodename' in episode and episode['episodename'] is not None:
       parsley['title'] = episode['episodename']
-      parsley['TVEpisode'] = u'{:02d} - {:s}'.format(episode_num, episode['episodename'])
+      parsley['TVEpisode'] = '{:02d} - {:s}'.format(episode_num, episode['episodename'])
     if '_actors' in show.data and len(show['_actors']) > 0:
       parsley['artist'] = _join_and_ellipsize([a['name'] for a in show['_actors']], ', ', 255, '')
     if 'seriesname' in show.data and show.data['seriesname'] is not None:
@@ -640,11 +642,11 @@ class FfMpeg(object):
       parsley['description'] = _join_and_ellipsize(episode['overview'].split(' '), ' ', 255)
       parsley['longdesc'] = episode['overview']
     if self.video_streams[0]['height'] > 720 or self.video_streams[0]['width'] > 1280:
-      parsley['hdvideo'] = 2
+      parsley['hdvideo'] = '2'
     elif self.video_streams[0]['height'] > 480 or self.video_streams[0]['height'] > 854:
-      parsley['hdvideo'] = 1
+      parsley['hdvideo'] = '1'
     else:
-      parsley['hdvideo'] = 0
+      parsley['hdvideo'] = '0'
     if 'filename' in episode and episode['filename'] is not None:
       self.log.debug('Downloading temporary jpeg from {:s}'.format(episode['filename']))
       cover_file = os.path.join(self.cleaner.temp_dir, os.path.basename(episode['filename']))
