@@ -488,13 +488,13 @@ class FfMpeg(object):
     return self
 
   def _garnish(self, parsley):
-    tagged_file = os.path.join(self.cleaner.temp_dir, u'.'.join([self.current_file_basename, 'tagged', self.current_file_ext]))
+    tagged_file = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'tagged', self.current_file_ext]))
     cmd = ['AtomicParsley', self.current_file, '--metaEnema', '--output', tagged_file]
     for key, value in parsley.items():
       if key == 'rDNSatom':
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
       else:
-        cmd.extend(['--{:s}'.format(key), value])
+        cmd.extend(['--{:s}'.format(key), value if isinstance(value, basestring) else unicode(value)])
     self.log.debug(_command_to_string(cmd))
     p = call(cmd)
     if p != 0:
