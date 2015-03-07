@@ -29,7 +29,8 @@ def _plist_to_string(root_object):
 def _command_to_string(command):
   if not isinstance(command, list):
     raise Exception('command_to_string takes a list, not a {:s}!'.format(type(command).__name__))
-  return ' '.join(["'" + s + "'" if ' ' in s else s for s in command])
+  msg = ' '.join(["'{:s}'".format(s) if ' ' in s else s for s in command])
+  return msg.decode('latin-1')
 
 def _all_keys_to_lowercase(d):
   if isinstance(d, list):
