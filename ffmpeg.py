@@ -367,7 +367,7 @@ class FfMpeg(object):
           stream['_copy'] = False
     return self
 
-  def convert_and_normalize(self):
+  def convert_and_normalize(self, add_filters=None):
     cmd = ['ffmpeg', '-hide_banner', '-stats', '-y', '-v', 'quiet']
     inputs = []
     maps = []
@@ -385,6 +385,8 @@ class FfMpeg(object):
     maps.extend(['-map', '{:d}:{:d}'.format(input_indices['main'], self.default_video_stream['index'])])
     if self.default_video_stream['_convert']:
       f = []
+      if add_filters is not None:
+        f.extend(add_filters)
       if '_fieldorder' in self.default_video_stream and self.default_video_stream['_fieldorder'] in ['TFF', 'BFF']:
         f.append('idet')
         f.append('yadif=0:{:d}:1'.format(0 if self.default_video_stream['_fieldorder'] == 'TFF' else 1))
@@ -467,7 +469,7 @@ class FfMpeg(object):
             input_count += 1
           maps.extend(['-map', '{:d}:{:d}'.format(input_indices['main'], stream['index'])])
           if '_gain' in stream:
-            filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}dB'.format(stream['gain'])])
+            filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}dB'.format(stream['_gain'])])
           converts.extend(['-c:a:{:d}'.format(audio_index), 'libfdk_aac', '-vbr:a:{:d}'.format(audio_index), '5', '-cutoff:a:{:d}'.format(audio_index), '20000', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
           audio_index += 1
 ### Subtitle
