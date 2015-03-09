@@ -503,8 +503,8 @@ class FfMpeg(object):
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
       else:
         cmd.extend(['--{:s}'.format(key), value])
-    cmd = [v.encode('utf-8') for v in cmd]
     self.log.debug(_command_to_string(cmd))
+    cmd = [v.encode('utf-8') for v in cmd]
     try:
       p = call(cmd)
     except TypeError as e:
