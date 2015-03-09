@@ -496,7 +496,8 @@ class FfMpeg(object):
       if key == 'rDNSatom':
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
       else:
-        cmd.extend(['--{:s}'.format(key), value if isinstance(value, basestring) else unicode(value)])
+        cmd.extend(['--{:s}'.format(key), value])
+    cmd = [unicode(v) for v in cmd]
     self.log.debug(_command_to_string(cmd))
     p = call(cmd)
     if p != 0:
