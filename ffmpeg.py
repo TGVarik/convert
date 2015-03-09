@@ -360,6 +360,8 @@ class FfMpeg(object):
         stream = [s for s in self.audio_streams if s['_measure'] == True][n]
       except IndexError as e:
         self.log.error('{} : {}'.format(len([s for s in self.audio_streams if s['_measure'] == True]), n))
+        for match in matches:
+          self.log.error(repr(match))
         raise e
       stream['_loudness'] = float(matches[n]['loudness'])
       self.log.info('Stream {:d} had loudness {:.1f}dB'.format(stream['index'], stream['_loudness']))
