@@ -497,9 +497,14 @@ class FfMpeg(object):
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
       else:
         cmd.extend(['--{:s}'.format(key), value])
-    cmd = [unicode(v) for v in cmd]
+    cmd = [v.encode('utf-8') for v in cmd]
     self.log.debug(_command_to_string(cmd))
-    p = call(cmd)
+    try:
+      p = call(cmd)
+    except TypeError as e:
+      for c in cmd:
+        self.log.error('{} : {}'.format(type(c).__name__, c))
+      raise e
     if p != 0:
       raise IOError('Tagging failed with exit code {:d}'.format(p))
     self.cleaner.add_path(tagged_file)
