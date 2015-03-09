@@ -356,7 +356,11 @@ class FfMpeg(object):
     matches = [m.groupdict() for m in re.finditer(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS', err.decode('latin-1'))]
     matches.sort(key=lambda ma: int(ma['position'], 16))
     for n in range(0, len(matches)):
-      stream = [s for s in self.audio_streams if s['_measure'] == True][n]
+      try:
+        stream = [s for s in self.audio_streams if s['_measure'] == True][n]
+      except IndexError as e:
+        self.log.error('{} : {}'.format(len([s for s in self.audio_streams if s['_measure'] == True]), n))
+        raise e
       stream['_loudness'] = float(matches[n]['loudness'])
       self.log.info('Stream {:d} had loudness {:.1f}dB'.format(stream['index'], stream['_loudness']))
       if abs(-23 - stream['_loudness']) > 1:
