@@ -23,6 +23,12 @@ from logs import setup_logging
 from tempfile import gettempdir
 from sys import argv
 
+def safeify(name):
+  safe_name = ' '.join(re.sub(pattern=r'[\\/:"*?<>|]', repl=' ', string=name).split())
+  if safe_name[-1] == '.':
+    safe_name = safe_name[:-1]
+  return safe_name
+
 def check_exists(folder, filename):
   if os.path.exists(os.path.join(folder, filename)) and os.path.isfile(os.path.join(folder, filename)):
     outerlog.debug('Destination file already exists!')
@@ -45,13 +51,12 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
   log = LoggerAdapter(getLogger(), {'identifier': '{:<13s}'.format(os.path.basename(file_path)[:13])})
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
     log.debug('TMDB ID: {:d}'.format(tmdb_id))
-    illegal_chars = re.compile(r'[\\/:"*?<>|]')
     movie = tmdb.Movies(tmdb_id)
     response = movie.info()
     title = response['title']
     release = datetime.strptime(response['release_date'], '%Y-%m-%d')
     log.debug('Movie title: {:s}'.format(title))
-    title_safe = ' '.join(illegal_chars.sub(repl=' ', string=title).split())
+    title_safe = safeify(title)
     log.debug('Safe movie title: {:s}'.format(title_safe))
     if collection is not None:
       destination_folder = os.path.join(plex_movie_section, collection)
@@ -92,21 +97,18 @@ def process_tv(file_path, show_id, season_number, episode_number, crop=False, ma
   log = LoggerAdapter(getLogger(), {'identifier': ident})
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
     log.debug('Show ID: {:d}, Season: {:d}, Episode: {:d}'.format(show_id, season_number, episode_number))
-    illegal_chars = re.compile(r'[\\/:"*?<>|]')
     tvdb = Tvdb(apikey=config['tvdb'], language='en', banners=True, actors=True)
     show = tvdb[show_id]
     show_name = show['seriesname']
     log.debug('Show name: {:s}'.format(show_name))
-    show_name_safe = ' '.join(illegal_chars.sub(repl=' ', string=show_name).split())
-    if show_name_safe[-1] == '.':
-      show_name_safe = show_name_safe[:-1]
+    show_name_safe = safeify(show_name)
     log.debug('Safe show name: {:s}'.format(show_name_safe))
     with Cleaner('{:s} S{:02d}E{:02d}'.format(show_name_safe, season_number, episode_number), ident) as c:
       season = show[season_number]
       episode = season[episode_number]
       episode_name = episode['episodename']
       log.debug('Episode name: {:s}'.format(episode_name))
-      episode_name_safe = ' '.join(illegal_chars.sub(repl=' ', string=episode_name).split())
+      episode_name_safe = safeify(episode_name)
       log.debug('Safe episode name: {:s}'.format(episode_name_safe))
       destination_folder = os.path.join(plex_tv_section, show_name_safe, 'Specials' if season_number == 0 else 'Season {:d}'.format(season_number))
       destination_filename = '{:s} - S{:02d}E{:02d} - {:s}.mp4'.format(show_name_safe, season_number, episode_number, episode_name_safe)
@@ -203,7 +205,7 @@ def on_get_status(torrent):
           sleep(60)
           ffmpegs = ffmpeg_count()
         log.debug('Done waiting')
-      process_tv(os.path.join(torrent_folder, target['path']), show_id, season_number, episode_number)
+      process_tv(os.path.join(torrent_folder, target['path']), show_id, season_number, episode_number, max_height=None)
       client.core.remove_torrent(torrentId, remove_data=True).addCallback(on_remove_torrent)
     else:
       outerlog.debug('Label \'{:s}\' not recognized'.format(label))
