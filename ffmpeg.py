@@ -29,7 +29,7 @@ def _plist_to_string(root_object):
 def _command_to_string(command):
   if not isinstance(command, list):
     raise Exception('command_to_string takes a list, not a {:s}!'.format(type(command).__name__))
-  l = ["'{:s}'".format(s) if ' ' in s else s for s in command]
+  l = ["'{:s}'".format(unicode(s)) if ' ' in unicode(s) else unicode(s) for s in command]
   result = re.sub('[\n\t]+', '', ' '.join(l))
   return result
 
@@ -366,7 +366,7 @@ class FfMpeg(object):
       stream['_loudness'] = float(matches[n]['loudness'])
       self.log.info('Stream {:d} had loudness {:.1f}dB'.format(stream['index'], stream['_loudness']))
       if abs(-23 - stream['_loudness']) > 1:
-        stream['_gain'] = abs(-23 - stream['_loudness'])
+        stream['_gain'] = -23 - stream['_loudness']
         self.log.info('Stream {:d} needs {:+.1f}dB of gain'.format(stream['index'], stream['_gain']))
         if stream['_copy'] and stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] <= 2:
           stream['_convert'] = True
@@ -502,7 +502,7 @@ class FfMpeg(object):
       if key == 'rDNSatom':
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
       else:
-        cmd.extend(['--{:s}'.format(key), value])
+        cmd.extend(['--{:s}'.format(key), unicode(value)])
     self.log.debug(_command_to_string(cmd))
     cmd = [v.encode('utf-8') for v in cmd]
     try:

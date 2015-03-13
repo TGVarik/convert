@@ -72,9 +72,9 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
         with FfMpeg(target, c) as n:
           if not tag_only:
             with Timer('Analyzing'):
-              n.analyze(crop=crop, keep_other_audio=keep_other_audio)
+              n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=None, deint=False)
             with Timer('Converting'):
-              n.convert_and_normalize(deinterlace=deint)
+              n.convert_and_normalize()
           if special_feature_title is None and special_feature_type is None:
             with Timer('Tagging'):
               n.tag_movie(tmdb_id, collection)
