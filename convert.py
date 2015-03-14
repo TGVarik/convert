@@ -58,7 +58,7 @@ def main():
 def retag_tv():
   folder = '/media/aristotle/retag/'
   show_id = 72116
-  searcher = re.compile(r's(?P<season>\d)e(?P<episode>\d\d)', re.I)
+  searcher = re.compile(r's(?P<season>\d+)e(?P<episode>\d+)', re.I)
   files = []
   for root, dirs, fs in os.walk(folder):
     files.extend([os.path.join(root, f) for f in fs if os.path.splitext(f)[1].lower() in ['.mkv', '.mp4', '.avi']])
