@@ -242,7 +242,7 @@ outerlog = getLogger()
 if __name__ == '__main__':
   temp_files = []
   torrentId = argv[1]
-  setup_logging('/var/log/deluge/finished')
+  setup_logging(os.path.join(config['log_path'], 'finished'))
   outerlog = getLogger()
   outerlog.info('finished.py called on {:s}'.format(argv[2]))
   outerlog.debug('Waiting ten seconds...')
