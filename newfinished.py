@@ -22,6 +22,7 @@ from time import sleep
 from logs import setup_logging
 from tempfile import gettempdir
 from sys import argv
+from psutil import process_iter
 
 def safeify(name):
   safe_name = ' '.join(re.sub(pattern=r'[\\/:"*?<>|]', repl=' ', string=name).split())
@@ -151,14 +152,10 @@ def on_remove_torrent(success):
   return
 
 def ffmpeg_count():
-  pids = [pid for pid in os.listdir('/proc') if pid.isdigit()]
   ffmpegs = 0
-  for pid in pids:
-    try:
-      if open(os.path.join('/proc', pid, 'cmdline'), 'rb').read().startswith('ffmpeg'):
-        ffmpegs += 1
-    except IOError:
-      continue
+  for process in process_iter():
+    if process.name() == 'ffmpeg':
+      ffmpegs += 1
   return ffmpegs
 
 def on_get_status(torrent):
@@ -248,7 +245,7 @@ if __name__ == '__main__':
   outerlog.debug('Waiting ten seconds...')
   sleep(10)
   outerlog.debug('Connecting to daemon...')
-  dd = client.connect(username='flexget', password='flexgetdeluge')
+  dd = client.connect(username='flexget', password='flexgetdeluge', host=config['deluge_host'])
   dd.addCallback(on_connect_success)
   dd.addErrback(on_connect_fail)
   reactor.run()
