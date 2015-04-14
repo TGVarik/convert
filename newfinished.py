@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-8
 from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
@@ -26,6 +27,7 @@ from psutil import process_iter
 
 def safeify(name):
   safe_name = ' '.join(re.sub(pattern=r'[\\/:"*?<>|]', repl=' ', string=name).split())
+  safe_name = re.sub(pattern='’', repl='\'', string=safe_name)
   if safe_name[-1] == '.':
     safe_name = safe_name[:-1]
   return safe_name
@@ -108,6 +110,8 @@ def process_tv(file_path, show_id, season_number, episode_number, crop=False, ma
       season = show[season_number]
       episode = season[episode_number]
       episode_name = episode['episodename']
+      if episode_name is None:
+        episode_name = ''
       log.debug('Episode name: {:s}'.format(episode_name))
       episode_name_safe = safeify(episode_name)
       log.debug('Safe episode name: {:s}'.format(episode_name_safe))
