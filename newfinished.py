@@ -47,7 +47,7 @@ def check_exists(folder, filename):
       with Timer('Moving to oldmp4'):
         os.rename(os.path.join(folder, filename), os.path.join(oldmp4_folder, filename))
 
-def process_movie(file_path, tmdb_id, collection=None, special_feature_title=None, special_feature_type=None, crop=True, keep_other_audio=True, deint=False, tag_only=False):
+def process_movie(file_path, tmdb_id, collection=None, special_feature_title=None, special_feature_type=None, crop=True, keep_other_audio=True, deint=False, tag_only=False, max_height=720):
   log = LoggerAdapter(getLogger(), {'identifier': '{:<13s}'.format(os.path.basename(file_path)[:13])})
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
     log.debug('TMDB ID: {:d}'.format(tmdb_id))
@@ -71,13 +71,13 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
     if not os.path.exists(destination_folder):
       os.makedirs(destination_folder)
     check_exists(destination_folder, destination_filename)
-    with Cleaner(title, temp_dir='/Volumes/Artemis/temp/') as c:
+    with Cleaner(title) as c:
       target = file_path
       with Timer('Processing') as t:
         with FfMpeg(target, c) as n:
           if not tag_only:
             with Timer('Analyzing'):
-              n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=None, deint=False)
+              n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=max_height, deint=False)
             with Timer('Converting'):
               n.convert_and_normalize()
           if special_feature_title is None and special_feature_type is None:
