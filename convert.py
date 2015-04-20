@@ -19,7 +19,7 @@ from newfinished import process_movie, process_tv, safeify
 
 
 def main_movies():
-  folder = '/Volumes/Artemis/The Sound of Music'
+  folder = '/Volumes/Artemis/Monsters Inc'
   searcher = re.compile(r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)(-(?P<feature_type>behindthescenes|deleted|interview|scene|trailer))?$')
   files = []
   for root, dirs, fs in os.walk(folder):
@@ -33,7 +33,7 @@ def main_movies():
         process_movie(f, int(match.group('tmdb_id')), collection=match.group('collection'), crop=True, special_feature_title=match.group('title'), special_feature_type=match.group('feature_type'))
         # print('feature_type is not None: {:s}'.format(match.group('feature_type')))
       else:
-        process_movie(f, int(match.group('tmdb_id')), collection=match.group('collection'), crop=True, tag_only=True)
+        process_movie(f, int(match.group('tmdb_id')), collection=match.group('collection'), crop=True, max_height=720)
       move(f, f + '.done')
     else:
       log.error('Movie filename does not match pattern')
@@ -77,4 +77,4 @@ if __name__ == '__main__':
   from logs import setup_logging
   setup_logging('convert')
   log = getLogger()
-  retag_tv()
+  main_movies()

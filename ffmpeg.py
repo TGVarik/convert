@@ -56,10 +56,10 @@ def _get_scaled(w, h, mw, mh):
   else:
     ow = w
     oh = h
-  return {'width': ow, 'height': oh}
+  return {'width': int(ow), 'height': int(oh)}
 
 def _fix_crop(match, max_height):
-  max_width = max_height * 16.0 / 9.0 if max_height is not None else None
+  max_width = math.floor(max_height * 16.0 / 9.0) if max_height is not None else None
   scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
   added = 0
   while scaled['width'] % 8 > 0 and scaled['width'] < max_width and match['x'] > 0:
@@ -376,7 +376,7 @@ class FfMpeg(object):
     return self
 
   def convert_and_normalize(self, add_filters=None):
-    cmd = ['ffmpeg', '-hide_banner', '-stats', '-y', '-v', 'quiet']
+    cmd = ['ffmpeg', '-hide_banner', '-stats', '-y']#, '-v', 'quiet']
     inputs = []
     maps = []
     filters = []
