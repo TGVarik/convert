@@ -19,6 +19,7 @@ from config import config
 from datetime import datetime
 from requests.exceptions import Timeout
 from qtfaststart import processor as qt
+from collections import OrderedDict
 
 tvdb_api_key = config['tvdb']
 tmdb.API_KEY = config['tmdb']
@@ -132,6 +133,7 @@ class FfMpeg(object):
           self.log.debug('Has video: {:d}, audio: {:d}, subtitle: {:d}'.format(len(self.video_streams), len(self.audio_streams), len(self.subtitle_streams)))
 
   def _analyze_audio(self, keep_others):
+    # TODO: Always request_channels 2 when codec_name is ac3 or dca!
     if len(self.audio_streams) < 1:
       raise Exception('No audio streams detected!')
     default = [s for s in self.audio_streams if s['channels'] == max(self.audio_streams, key=lambda i:i['channels'])['channels']]
@@ -330,7 +332,7 @@ class FfMpeg(object):
         filters.extend(['-filter:a:{:d}'.format(audio_index), 'ebur128'])
         aac_to_ac3_audio_index += 1
         audio_index += 1
-      elif stream['channels'] > 2:
+      elif stream['channels'] > 2 or stream['codec_name'] in ['ac3', 'dca']:
         if input_indices['request_channels'] is None:
           inputs.extend(['-request_channels', '2', '-i', self.current_file])
           input_indices['request_channels'] = input_count
@@ -353,8 +355,27 @@ class FfMpeg(object):
     self.log.debug(_command_to_string(cmd))
     p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     _, err = p.communicate()
-    matches = [m.groupdict() for m in re.finditer(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS', err.decode('latin-1'))]
-    matches.sort(key=lambda ma: int(ma['position'], 16))
+    output = err.declde('latin-1')
+    summary_finder = re.compile(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS')
+    matches = [m for m in summary_finder.finditer(output)]
+    matches.sort(key=lambda ma: int(ma.groupdict()['position'], 16))
+
+    # if len(matches) > len([s for s in self.audio_streams if s['_measure'] == True]):
+    #   # Input stream #0:1 frame changed from rate:48000 fmt:fltp ch:2 chl:stereo to rate:48000 fmt:fltp ch:6 chl:5.1(side)
+    #   change_finder = re.compile(r'Input\sstream\s#(?P<input>\d):(?P<stream>\d)\sframe\schanged\sfrom\srate:(?P<old_rate>\d+)\sfmt:(?P<old_fmt>\S+)\sch:(?P<old_ch>\d)\schl:(?P<old_chl>\S+)\sto\srate:(?P<new_rate>\d+)\sfmt:(?P<new_fmt>\S+)\sch:(?P<new_ch>\d)\schl:(?P<new_chl>\S+)\s')
+    #   changes = [m for m in change_finder.finditer(output)]
+    #   if len(changes) > 0:
+    #     for input in OrderedDict.fromkeys([m.group('input') for m in changes]).keys():
+    #       for stream in OrderedDict.fromkeys([m.group('stream') for m in changes if m.group('input') == input]).keys():
+    #         stream_changes = [change for change in changes if change.group('input') == input and change.group('stream') == stream]
+    #         for i in range(len(stream_changes)):
+    #           if i + 1 == len(stream_changes):
+    #             stream_changes[i]._percent = len(output) - stream_changes[i].end()
+    #           else:
+    #             stream_changes[i]._percent = stream_changes[i + 1].start() - stream_changes[i].end()
+    #
+    #   else:
+    #     throw
     for n in range(0, len(matches)):
       try:
         stream = [s for s in self.audio_streams if s['_measure'] == True][n]
@@ -365,7 +386,7 @@ class FfMpeg(object):
         self.log.error('assuming discontinuity; continuing...')
         stream = [s for s in self.audio_streams if s['_measure'] == True][n - 1]
         # raise e
-      stream['_loudness'] = float(matches[n]['loudness'])
+      stream['_loudness'] = float(matches[n].group('loudness'))
       self.log.info('Stream {:d} had loudness {:.1f}dB'.format(stream['index'], stream['_loudness']))
       if abs(-23 - stream['_loudness']) > 1:
         stream['_gain'] = -23 - stream['_loudness']
