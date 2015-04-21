@@ -463,7 +463,7 @@ class FfMpeg(object):
           audio_index += 1
         if stream['_copy'] or stream['_convert']:
           aac_to_ac3_audio_index += 1
-      elif stream['channels'] > 2:
+      elif stream['channels'] > 2 or stream['codec_name'] in ['ac3', 'dca']:
         if stream['_copy']:
           if input_indices['main'] is None:
             inputs.extend(['-i', self.current_file])
