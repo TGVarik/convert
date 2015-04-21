@@ -355,7 +355,7 @@ class FfMpeg(object):
     self.log.debug(_command_to_string(cmd))
     p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     _, err = p.communicate()
-    output = err.declde('latin-1')
+    output = err.decode('latin-1')
     summary_finder = re.compile(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS')
     matches = [m for m in summary_finder.finditer(output)]
     matches.sort(key=lambda ma: int(ma.groupdict()['position'], 16))
