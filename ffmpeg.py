@@ -20,6 +20,7 @@ from datetime import datetime
 from requests.exceptions import Timeout
 from qtfaststart import processor as qt
 from collections import OrderedDict
+from copy import copy
 
 tvdb_api_key = config['tvdb']
 tmdb.API_KEY = config['tmdb']
@@ -48,9 +49,11 @@ def _join_and_ellipsize(elements, joiner, max_length, ellipsis=u'…'):
     s = joiner.join(elements[:n]) + ellipsis
   return s
 
-def _get_scaled(w, h, mw, mh):
+def _get_scaled(dims, mw, mh):
+  w = dims['width']
+  h = dims['height']
   if mw is not None and mh is not None and (w > mw or h > mh):
-    ma = mw / mh
+    ma = float(mw) / float(mh)
     a = float(w) / float(h)
     ow = mw if a >= ma else math.ceil(mh*a)
     oh = math.ceil(mw/a) if a > ma else mh
@@ -59,24 +62,88 @@ def _get_scaled(w, h, mw, mh):
     oh = h
   return {'width': int(ow), 'height': int(oh)}
 
-def _fix_crop(match, max_height):
+def _fix_crop(original, max_height, crop=None):
+  if crop is None:
+    crop = {'x': 0, 'y': 0, 'width': original['width'], 'height': original['height']}
   max_width = math.floor(max_height * 16.0 / 9.0) if max_height is not None else None
-  scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
-  added = 0
-  while scaled['width'] % 8 > 0 and scaled['width'] < max_width and match['x'] > 0:
-    added += 1
-    match['width'] += 1
-    if added % 2 == 0:
-      match['x'] -= 1
-    scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
-  added = 0
-  while scaled['height'] % 8 > 0 and scaled['height'] < max_height and match['y'] > 0:
-    added += 1
-    match['height'] += 1
-    if added % 2 == 0:
-      match['y'] -= 1
-    scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
-  return scaled
+  adjusted = copy(crop)
+
+  while _get_scaled(adjusted, max_width, max_height)['width'] % 8 > 0:
+    adjusted['width'] += 1
+    adjusted['x'] -= (1 if ((adjusted['width'] - crop['width']) % 2 == 0) else 0)
+  while _get_scaled(adjusted, max_width, max_height)['height'] % 8 > 0:
+    adjusted['height'] += 1
+    adjusted['y'] -= 1 if (adjusted['height'] - crop['height']) % 2 == 0 else 0
+  pad = {'width': adjusted['width'], 'height': adjusted['height'], 'x': 0, 'y': 0}
+  while adjusted['x'] < 0:
+    adjusted['x'] += 1
+    pad['x'] += 1
+  while adjusted['width'] + adjusted['x'] > original['width']:
+    adjusted['width'] -= 1
+  while adjusted['y'] < 0:
+    adjusted['y'] += 1
+    pad['y'] += 1
+  while adjusted['height'] + adjusted['y'] > original['height']:
+    adjusted['height'] -= 1
+
+  scaled = _get_scaled(pad, max_width, max_height)
+
+  result = {}
+
+  if original['width'] != adjusted['width'] or original['height'] != adjusted['height']:
+    result['crop'] = adjusted
+
+  if adjusted['width'] != pad['width'] or adjusted['height'] != pad['height']:
+    result['pad'] = pad
+
+  if scaled['width'] != pad['width'] or scaled['height'] != pad['height']:
+    result['scale'] = scaled
+
+  return result
+
+  # do_crop = abs(original['width'] - crop['width']) > tolerance or abs(original['height'] - crop['height']) > tolerance
+  # result = {
+  #   'crop': crop if do_crop else original,
+  # }
+  # result['scale'] = _get_scaled(result['crop']['width'], result['crop']['height'], max_width, max_height)
+  #
+  #
+  #
+  #
+  # scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
+  #
+  # if max_width - match['width'] < tolerance && max_height - match['height'] < tolerance:
+  #
+  #
+  # added = 0
+  # while scaled['width'] % 8 > 0 and scaled['width'] < max_width and match['x'] > 0:
+  #   added += 1
+  #   match['width'] += 1
+  #   if added % 2 == 0:
+  #     match['x'] -= 1
+  #   scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
+  # added = 0
+  # while scaled['height'] % 8 > 0 and scaled['height'] < max_height and match['y'] > 0:
+  #   added += 1
+  #   match['height'] += 1
+  #   if added % 2 == 0:
+  #     match['y'] -= 1
+  #   scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
+  # if scaled['width'] % 8 > 0 and scaled['width'] < max_width and match['x'] == 0:
+  #   scaled['pad'] = {'x': 0, 'y': 0, 'w': scaled['width'], 'h': scaled['height']}
+  #   while scaled['pad']['w'] % 8 > 0:
+  #     scaled['pad']['w'] += 1
+  #     if (scaled['pad']['w'] - scaled['width']) % 2 == 0:
+  #       scaled['pad']['x'] += 1
+  # if scaled['height'] % 8 > 0 and scaled['height'] < max_height and match['y'] == 0:
+  #   if not 'pad' in scaled:
+  #     scaled['pad'] = {'x': 0, 'y': 0, 'w': scaled['width'], 'h': scaled['height']}
+  #   while scaled['pad']['h'] % 8 > 0:
+  #     scaled['pad']['h'] += 1
+  #     if (scaled['pad']['h'] - scaled['height']) % 2 == 0:
+  #       scaled['pad']['y'] += 1
+  #
+  # return scaled
 
 class FfMpeg(object):
   def __init__(self, filepath, cleaner=None, ident=None):
@@ -172,18 +239,17 @@ class FfMpeg(object):
     if any([s['_measure'] for s in self.audio_streams]):
       self._measure_loudness()
 
-  def _analyze_crop_scale_deint(self, crop, max_height, deint):
-    tolerance = 8
+  def _analyze_crop_scale_deint(self, crop, max_height, deint, force_field_order):
     cropmatches = []
     deintmatches = []
     filters = []
     rcrop = re.compile(r'crop=(?P<width>\d+):(?P<height>\d+):(?P<x>\d+):(?P<y>\d+)\D', re.I)
     rdeint = re.compile(r'Multi\sframe\sdetection:\sTFF:\s*(?P<tff>\d+)\sBFF:\s*(?P<bff>\d+)\sProgressive:\s*(?P<pro>\d+)\sUndetermined:\s*(?P<und>\d+)', re.I)
-    if deint:
+    if deint and force_field_order is None:
       filters.append('idet')
     if crop:
       filters.append('cropdetect=24:1:0')
-    if crop or deint:
+    if crop or (deint and force_field_order is None):
       n = int(math.floor(float(self.current_file_info['format']['duration']) / 240))
       if n > 1:
         for i in range(1,n):
@@ -227,45 +293,44 @@ class FfMpeg(object):
           deintmatches.extend(found)
     if crop:
       match = {k: int(v) for k,v in max(cropmatches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
-    if (not crop) or (crop and abs(self.default_video_stream['width'] - match['width']) <= tolerance and abs(self.default_video_stream['height'] - match['height']) <= tolerance):
-      match = {'width': self.default_video_stream['width'],
-               'height': self.default_video_stream['height'],
-               'x': 0,
-               'y': 0}
-    if deint:
-      deint_data = {
-        'TFF': sum([int(m['tff']) for m in deintmatches]),
-        'BFF': sum([int(m['bff']) for m in deintmatches]),
-        'Progressive': sum([int(m['pro']) for m in deintmatches]),
-        'Undetermined': sum([int(m['und']) for m in deintmatches])
-      }
-      totalframes = float(sum(deint_data.values()))
-      detectedframes = float(sum([v for k,v in deint_data.items() if k != 'Undetermined']))
-      deint_data = {k: [float(v) / totalframes, float(v)/detectedframes] for k, v in deint_data.items()}
-      fieldorder, pct = max(deint_data.items(), key=lambda x:x[1][0])
-      if fieldorder in ['TFF', 'BFF', 'Progressive'] and pct[0] >= 0.75 and pct[1] >= 0.95:
-        self.default_video_stream['_fieldorder'] = fieldorder
-      else:
-        self.default_video_stream['_fieldorder'] = 'Undetermined'
-      self.log.info('Field order is: {:s}'.format(self.default_video_stream['_fieldorder']))
-    scaled = _fix_crop(match, max_height=max_height)
-    crop = crop and (match['height'] < self.default_video_stream['height'] or match['width'] < self.default_video_stream['width'])
-    scale = scaled['width'] < match['width'] or scaled['height'] < match['height']
-    if crop:
-      self.default_video_stream['_crop'] = match
-    if scale:
-      self.default_video_stream['_scale'] = scaled
-    if crop or scale:
-      s = 'Will '
-      if crop:
-        s += 'crop to {width:d}:{height:d}:{x:d}:{y:d}'.format(**match)
-        if scale:
-          s += ' and will '
-      if scale:
-        s += 'scale to {width:d}:{height:d}'.format(**scaled)
-      self.log.info(s)
+      results = _fix_crop(self.default_video_stream, max_height=max_height, crop=match)
+    else:
+      results = _fix_crop(self.default_video_stream, max_height=max_height)
 
-  def _analyze_video(self, allow_crop, max_height, deint):
+    if deint:
+      if force_field_order is None:
+        deint_data = {
+          'TFF': sum([int(m['tff']) for m in deintmatches]),
+          'BFF': sum([int(m['bff']) for m in deintmatches]),
+          'Progressive': sum([int(m['pro']) for m in deintmatches]),
+          'Undetermined': sum([int(m['und']) for m in deintmatches])
+        }
+        totalframes = float(sum(deint_data.values()))
+        detectedframes = float(sum([v for k,v in deint_data.items() if k != 'Undetermined']))
+        deint_data = {k: [float(v) / totalframes, float(v)/detectedframes] for k, v in deint_data.items()}
+        fieldorder, pct = max(deint_data.items(), key=lambda x:x[1][0])
+        if fieldorder in ['TFF', 'BFF', 'Progressive'] and pct[0] >= 0.75 and pct[1] >= 0.95:
+          self.default_video_stream['_fieldorder'] = fieldorder
+        else:
+          self.default_video_stream['_fieldorder'] = 'Undetermined'
+        self.log.info('Field order is: {:s}'.format(self.default_video_stream['_fieldorder']))
+      else:
+        self.default_video_stream['_fieldorder'] = force_field_order
+        self.log.info('Field order forced to: {:s}'.format(self.default_video_stream['_fieldorder']))
+
+    self.log.debug('Crop/pad/scale analysis result: {:s}'.format(json.dumps(results)))
+
+    if 'crop' in results:
+      self.log.info('Will crop to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(results['crop'])))
+      self.default_video_stream['_crop'] = results['crop']
+    if 'pad' in results:
+      self.log.info('Will pad to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(results['pad'])))
+      self.default_video_stream['_pad'] = results['pad']
+    if 'scale' in results:
+      self.log.info('Will scale to {width:d}:{height:d}'.format(**(results['scale'])))
+      self.default_video_stream['_scale'] = results['scale']
+
+  def _analyze_video(self, allow_crop, max_height, deint, force_field_order):
     if len(self.video_streams) < 1:
       raise Exception('No video streams detected!')
     elif len(self.video_streams) > 1:
@@ -280,15 +345,15 @@ class FfMpeg(object):
     else:
       self.default_video_stream = self.video_streams[0]
     if allow_crop or deint or max_height is not None:
-      self._analyze_crop_scale_deint(crop=allow_crop, max_height=max_height, deint=deint)
+      self._analyze_crop_scale_deint(crop=allow_crop, max_height=max_height, deint=deint, force_field_order=force_field_order)
     vs = self.default_video_stream
     if vs['codec_name'] != 'h264' or '_crop' in vs or '_scale' in vs or (deint and vs['_fieldorder'] in ['TFF', 'BFF']):
       vs['_convert'] = True
     else:
       vs['_convert'] = False
 
-  def analyze(self, allow_crop=True, max_height=None, keep_other_audio=False, deint=False):
-    self._analyze_video(allow_crop=allow_crop, max_height=max_height, deint=deint)
+  def analyze(self, allow_crop=True, max_height=None, keep_other_audio=False, deint=False, force_field_order=None):
+    self._analyze_video(allow_crop=allow_crop, max_height=max_height, deint=deint, force_field_order=force_field_order)
     self._analyze_audio(keep_others=keep_other_audio)
 
   def _build_aac_to_ac3_pipeline(self):
@@ -421,6 +486,8 @@ class FfMpeg(object):
         f.append('yadif=0:{:d}:1'.format(0 if self.default_video_stream['_fieldorder'] == 'TFF' else 1))
       if '_crop' in self.default_video_stream:
         f.append('crop={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_crop'])))
+      if '_pad' in self.default_video_stream:
+        f.append('pad={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_pad'])))
       if '_scale' in self.default_video_stream:
         f.append('scale={width:d}:{height:d}'.format(**(self.default_video_stream['_scale'])))
       if len(f) > 0:
@@ -621,7 +688,7 @@ class FfMpeg(object):
   def tag_tv(self, show_id, season_num, episode_num, dvdOrder=False):
     for i in range(0,4):
       try:
-        tvdb = Tvdb(apikey=tvdb_api_key, language='en', banners=True, actors=True, dvdorder = dvdOrder)
+        tvdb = Tvdb(apikey=tvdb_api_key, language='en', banners=True, actors=True, dvdorder=dvdOrder)
         show = tvdb[show_id]
         episode = show[season_num][episode_num]
       except tvdb_error as e:
