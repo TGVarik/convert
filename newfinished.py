@@ -26,7 +26,7 @@ from sys import argv
 from psutil import process_iter
 
 def safeify(name):
-  safe_name = ' '.join(re.sub(pattern=r'[\\/:"*?<>|]', repl=' ', string=name).split())
+  safe_name = ' '.join(re.sub(pattern=r'[\\/:"*?<>|…]', repl=' ', string=name).split())
   safe_name = re.sub(pattern='’', repl='\'', string=safe_name)
   if safe_name[-1] == '.':
     safe_name = safe_name[:-1]
