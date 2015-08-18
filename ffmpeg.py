@@ -353,6 +353,7 @@ class FfMpeg(object):
       vs['_convert'] = False
 
   def analyze(self, allow_crop=True, max_height=None, keep_other_audio=False, deint=False, force_field_order=None):
+    self._max_height = max_height
     self._analyze_video(allow_crop=allow_crop, max_height=max_height, deint=deint, force_field_order=force_field_order)
     self._analyze_audio(keep_others=keep_other_audio)
 
@@ -492,7 +493,7 @@ class FfMpeg(object):
         f.append('scale={width:d}:{height:d}'.format(**(self.default_video_stream['_scale'])))
       if len(f) > 0:
         filters.extend(['-filter:v:0', ','.join(f)])
-      converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '20'])
+      converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '20' if self._max_height <= 720 else '24'])
     else:
       converts.extend(['-c:v:0', 'copy'])
     ### Audio
