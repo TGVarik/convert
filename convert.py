@@ -14,7 +14,7 @@ from newfinished import process_movie, process_tv
 
 
 def main_movies():
-  folder = '/Users/tom/Movies/'
+  folder = '/tank/Incoming/'
   searcher = re.compile(
     r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)(-(?P<feature_type>behindthescenes|deleted|interview|scene|trailer))?$')
   files = []
@@ -37,6 +37,7 @@ def main_movies():
                       int(match.group('tmdb_id')),
                       collection=match.group('collection'),
                       crop=True,
+                      keep_other_audio=True,
                       max_height=720)
       move(f, f + '.done')
     else:
@@ -44,7 +45,7 @@ def main_movies():
 
 
 def main():
-  folder = u'/Volumes/storage/deluge/finished/Star Trek The Next Generation Season 6/'
+  folder = u'/tank/deluge/finished/Rick and Morty S1 Complete (Uncensored) (1920x1080) [Phr0stY]/'
   searcher = re.compile(r's(?P<season>\d\d?)e(?P<episode>\d\d)', re.I)
   files = []
   for root, dirs, fs in os.walk(folder):
@@ -55,12 +56,12 @@ def main():
     match = searcher.search(os.path.basename(f))
     if match:
       process_tv(f,
-                 71470,
+                 275274,
                  int(match.group('season')),
                  int(match.group('episode')),
                  crop=True,
                  deint=False,
-                 max_height=720)
+                 max_height=1080)
       move(f, f + '.done')
 
 
@@ -89,4 +90,4 @@ if __name__ == '__main__':
 
   setup_logging('convert')
   log = getLogger()
-  main_movies()
+  main()
