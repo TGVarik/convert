@@ -596,13 +596,14 @@ class FfMpeg(object):
     self.log.debug(_command_to_string(cmd))
     cmd = [v.encode('utf-8') for v in cmd]
     try:
-      p = call(cmd)
+      p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     except TypeError as e:
       for c in cmd:
         self.log.error('{} : {}'.format(type(c).__name__, c))
       raise e
-    if p != 0:
-      raise IOError('Tagging failed with exit code {:d}'.format(p))
+    (out, err) = p.communicate()
+    if p.returncode != 0:
+      raise IOError('Tagging failed with exit code {:d}\n{:s}'.format(p, err))
     self.cleaner.add_path(tagged_file)
     self._refresh(tagged_file)
 
