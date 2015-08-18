@@ -603,7 +603,7 @@ class FfMpeg(object):
       raise e
     (out, err) = p.communicate()
     if p.returncode != 0:
-      raise IOError('Tagging failed with exit code {:d}\n{:s}'.format(p, err))
+      raise IOError('Tagging failed with exit code {:d}\n{:s}'.format(p.returncode, err))
     self.cleaner.add_path(tagged_file)
     self._refresh(tagged_file)
 
