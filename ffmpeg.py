@@ -471,7 +471,7 @@ class FfMpeg(object):
     input_indices = {'main': None, 'aac_to_ac3': None, 'request_channels': None, 'aac_request_channels': None}
     aac_to_ac3_audio_index = 0
     audio_index = 0
-### Video
+    ### Video
     if input_indices['main'] is None:
       inputs.extend(['-i', self.current_file])
       input_indices['main'] = input_count
@@ -495,7 +495,7 @@ class FfMpeg(object):
       converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '20'])
     else:
       converts.extend(['-c:v:0', 'copy'])
-### Audio
+    ### Audio
     for stream in self.audio_streams:
       if stream['codec_name'] in ['aac', 'libfdk_aac'] and stream['channels'] > 2:
         if stream['_copy']:
@@ -568,9 +568,9 @@ class FfMpeg(object):
             filters.extend(['-filter:a:{:d}'.format(audio_index), 'volume={:.1f}dB'.format(stream['_gain'])])
           converts.extend(['-c:a:{:d}'.format(audio_index), 'libfdk_aac', '-vbr:a:{:d}'.format(audio_index), '5', '-cutoff:a:{:d}'.format(audio_index), '20000', '-metadata:s:a:{:d}'.format(audio_index), 'language={:s}'.format(stream['tags']['language'])])
           audio_index += 1
-### Subtitle
+        ### Subtitle
     converts.append('-sn')
-### Final
+    ### Final
     cmd.extend(inputs)
     cmd.extend(maps)
     cmd.extend(filters)
@@ -752,6 +752,12 @@ class FfMpeg(object):
       urlretrieve(episode['filename'], cover_file)
       self.cleaner.add_path(cover_file)
       parsley['artwork'] = cover_file
+      if os.path.splitext(cover_file)[1].lower() == '.jpg':
+        with open(cover_file, 'r+b') as f:
+          fourbytes = [ord(b) for b in f.read(4)]
+          if fourbytes[0] == 0xff and fourbytes[1] == 0xd8 and fourbytes[2] == 0xff and fourbytes[3] != 0xe0:
+            f.seek(3)
+            f.write(chr(0xe0))
     self._garnish(parsley)
     return self
 
