@@ -38,7 +38,7 @@ def main_movies():
                       collection=match.group('collection'),
                       crop=True,
                       keep_other_audio=True,
-                      max_height=720)
+                      max_height=1080)
       move(f, f + '.done')
     else:
       log.error('Movie filename does not match pattern')
