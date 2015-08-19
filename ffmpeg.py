@@ -493,7 +493,7 @@ class FfMpeg(object):
         f.append('scale={width:d}:{height:d}'.format(**(self.default_video_stream['_scale'])))
       if len(f) > 0:
         filters.extend(['-filter:v:0', ','.join(f)])
-      converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '20' if self._max_height <= 720 else '24'])
+      converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '22'])
     else:
       converts.extend(['-c:v:0', 'copy'])
     ### Audio
