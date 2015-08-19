@@ -85,9 +85,6 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
             else:
               destination_filename = '{:s} ({:d}).mp4'.format(title_safe, release.year)
           log.info('Destination path: {:s}'.format(os.path.join(destination_folder, destination_filename)))
-          if not os.path.exists(destination_folder):
-            os.makedirs(destination_folder)
-          check_exists(destination_folder, destination_filename)
           if not tag_only:
             with Timer('Converting', ident):
               n.convert_and_normalize()
@@ -97,6 +94,9 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
           with Timer('Verifying faststart', ident):
             n.faststart()
           out = n.current_file
+          if not os.path.exists(destination_folder):
+            os.makedirs(destination_folder)
+          check_exists(destination_folder, destination_filename)
       c.timer_pushover(t)
       with Timer('Moving to Plex', ident):
         move(out, os.path.join(destination_folder, destination_filename))
