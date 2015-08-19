@@ -70,7 +70,7 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
     with Cleaner('{:s}{:s}'.format(title, ' {:d}p'.format(max_height) if max_height is not None else ''), ident) as c:
       target = file_path
       with Timer('Processing', ident) as t:
-        with FfMpeg(target, c) as n:
+        with FfMpeg(target, c, ident) as n:
           if not tag_only:
             with Timer('Analyzing', ident):
               n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=max_height, deint=deint, force_field_order=force_field_order)
