@@ -67,7 +67,7 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
     else:
       destination_folder = os.path.join(plex_movie_section)
     destination_folder = os.path.join(destination_folder, '{:s} ({:d})'.format(title_safe, release.year))
-    with Cleaner('{:s}{:s}'.format(title, ' {:s}p'.format(max_height) if max_height is not None else ''), ident) as c:
+    with Cleaner('{:s}{:s}'.format(title, ' {:d}p'.format(max_height) if max_height is not None else ''), ident) as c:
       target = file_path
       with Timer('Processing', ident) as t:
         with FfMpeg(target, c) as n:
