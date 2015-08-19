@@ -51,7 +51,8 @@ def check_exists(folder, filename):
         os.rename(os.path.join(folder, filename), os.path.join(oldmp4_folder, filename))
 
 def process_movie(file_path, tmdb_id, collection=None, special_feature_title=None, special_feature_type=None, crop=True, keep_other_audio=True, deint=False, tag_only=False, max_height=720, force_field_order=None, res_in_filename=False):
-  log = LoggerAdapter(getLogger(), {'identifier': '{:<13s}'.format(os.path.basename(file_path)[:13])})
+  ident = '{:<13s}'.format(os.path.basename(file_path)[:13])
+  log = LoggerAdapter(getLogger(), {'identifier': ident})
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
     log.debug('TMDB ID: {:d}'.format(tmdb_id))
     movie = tmdb.Movies(tmdb_id)
@@ -66,37 +67,38 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
     else:
       destination_folder = os.path.join(plex_movie_section)
     destination_folder = os.path.join(destination_folder, '{:s} ({:d})'.format(title_safe, release.year))
-    with Cleaner(title) as c:
+    with Cleaner('{:s}{:s}'.format(title, ' {:s}p'.format(max_height) if max_height is not None else ''), ident) as c:
       target = file_path
-      with Timer('Processing') as t:
+      with Timer('Processing', ident) as t:
         with FfMpeg(target, c) as n:
           if not tag_only:
-            with Timer('Analyzing'):
+            with Timer('Analyzing', ident):
               n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=max_height, deint=deint, force_field_order=force_field_order)
-            height = n.default_video_stream['_scale']['height'] if '_scale' in n.default_video_stream else (n.default_video_stream['_pad']['_height'] if '_pad' in n.default_video_stream else (n.default_video_stream['_crop']['height'] if '_crop' in n.default_video_stream else (n.default_video_stream['height'])))
-            height = min(height, max_height)
-            res = '1080p' if height > 720 else ('720p' if height > 480 else '480p')
-            if special_feature_title is not None and special_feature_type is not None:
-              destination_filename = '{:s}-{:s}.mp4'.format(special_feature_title,special_feature_type)
+          height = n.default_video_stream['_scale']['height'] if '_scale' in n.default_video_stream else (n.default_video_stream['_pad']['_height'] if '_pad' in n.default_video_stream else (n.default_video_stream['_crop']['height'] if '_crop' in n.default_video_stream else (n.default_video_stream['height'])))
+          height = min(height, max_height)
+          res = '1080p' if height > 720 else ('720p' if height > 480 else '480p')
+          if special_feature_title is not None and special_feature_type is not None:
+            destination_filename = '{:s}-{:s}.mp4'.format(special_feature_title,special_feature_type)
+          else:
+            if res_in_filename:
+              destination_filename = '{:s} ({:d}).{:s}.mp4'.format(title_safe, release.year, res)
             else:
-              if res_in_filename:
-                destination_filename = '{:s} ({:d}).{:s}.mp4'.format(title_safe, release.year, res)
-              else:
-                destination_filename = '{:s} ({:d}).mp4'.format(title_safe, release.year)
-            log.info('Destination path: {:s}'.format(os.path.join(destination_folder, destination_filename)))
-            if not os.path.exists(destination_folder):
-              os.makedirs(destination_folder)
-            check_exists(destination_folder, destination_filename)
-            with Timer('Converting'):
+              destination_filename = '{:s} ({:d}).mp4'.format(title_safe, release.year)
+          log.info('Destination path: {:s}'.format(os.path.join(destination_folder, destination_filename)))
+          if not os.path.exists(destination_folder):
+            os.makedirs(destination_folder)
+          check_exists(destination_folder, destination_filename)
+          if not tag_only:
+            with Timer('Converting', ident):
               n.convert_and_normalize()
           if special_feature_title is None and special_feature_type is None:
-            with Timer('Tagging'):
+            with Timer('Tagging', ident):
               n.tag_movie(tmdb_id, collection)
-          with Timer('Verifying faststart'):
+          with Timer('Verifying faststart', ident):
             n.faststart()
           out = n.current_file
       c.timer_pushover(t)
-      with Timer('Moving to Plex'):
+      with Timer('Moving to Plex', ident):
         move(out, os.path.join(destination_folder, destination_filename))
     log.info('Processing complete')
     refresh_plex(source_type='movie')

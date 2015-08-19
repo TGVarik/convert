@@ -12,6 +12,42 @@ import tmdbsimple as tmdb
 from config import config
 from newfinished import process_movie, process_tv
 
+def blu_movies():
+  folder = '/tank/Incoming/'
+  searcher = re.compile(
+    r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)$')
+  files = []
+  for root, dirs, fs in os.walk(folder):
+    files.extend([os.path.join(root, f) for f in fs if
+                  os.path.splitext(f)[1].lower() in ['.mkv', '.mp4', '.avi']])
+  print('{:d} files found.'.format(len(files)))
+  for f in files:
+    match = searcher.search(os.path.splitext(os.path.basename(f))[0])
+    if match:
+      process_movie(f,
+                    int(match.group('tmdb_id')),
+                    collection=match.group('collection'),
+                    crop=True,
+                    keep_other_audio=True,
+                    max_height=1080,
+                    res_in_filename=True)
+      process_movie(f,
+                    int(match.group('tmdb_id')),
+                    collection=match.group('collection'),
+                    crop=True,
+                    keep_other_audio=True,
+                    max_height=720,
+                    res_in_filename=True)
+      process_movie(f,
+                    int(match.group('tmdb_id')),
+                    collection=match.group('collection'),
+                    crop=True,
+                    keep_other_audio=True,
+                    max_height=480,
+                    res_in_filename=True)
+      move(f, f + '.done')
+    else:
+      log.error('Movie filename does not match pattern')
 
 def main_movies():
   folder = '/tank/Incoming/'
@@ -91,4 +127,4 @@ if __name__ == '__main__':
 
   setup_logging('convert')
   log = getLogger()
-  main_movies()
+  blu_movies()
