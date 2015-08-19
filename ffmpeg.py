@@ -293,6 +293,7 @@ class FfMpeg(object):
           deintmatches.extend(found)
     if crop:
       match = {k: int(v) for k,v in max(cropmatches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
+      self.log.debug('_fix_crop: original={:s} max_height={:d} crop={:s}'.format(json.dumps({'height': self.default_video_stream['height'], 'width': self.default_video_stream['width']}), max_height, json.dumps(crop)))
       results = _fix_crop(self.default_video_stream, max_height=max_height, crop=match)
     else:
       results = _fix_crop(self.default_video_stream, max_height=max_height)
