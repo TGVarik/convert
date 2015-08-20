@@ -62,88 +62,28 @@ def _get_scaled(dims, mw, mh):
     oh = h
   return {'width': int(ow), 'height': int(oh)}
 
+def _get_max_width(max_height):
+  if max_height is None:
+    return None
+  ret = math.floor(max_height * 16.0 / 9.0)
+  while (ret * 3.0 / 2.0) % 16 != 0:
+    ret -= 1
+  return ret
+
 def _fix_crop(original, max_height, crop=None):
+  result = {}
   if crop is None:
     crop = {'x': 0, 'y': 0, 'width': original['width'], 'height': original['height']}
-  max_width = math.floor(max_height * 16.0 / 9.0) if max_height is not None else None
-  adjusted = copy(crop)
+  scaled = _get_scaled(crop, _get_max_width(max_height), max_height)
 
-  while _get_scaled(adjusted, max_width, max_height)['width'] % 8 > 0:
-    adjusted['width'] += 1
-    adjusted['x'] -= (1 if ((adjusted['width'] - crop['width']) % 2 == 0) else 0)
-  while _get_scaled(adjusted, max_width, max_height)['height'] % 8 > 0:
-    adjusted['height'] += 1
-    adjusted['y'] -= 1 if (adjusted['height'] - crop['height']) % 2 == 0 else 0
-  pad = {'width': adjusted['width'], 'height': adjusted['height'], 'x': 0, 'y': 0}
-  while adjusted['x'] < 0:
-    adjusted['x'] += 1
-    pad['x'] += 1
-  while adjusted['width'] + adjusted['x'] > original['width']:
-    adjusted['width'] -= 1
-  while adjusted['y'] < 0:
-    adjusted['y'] += 1
-    pad['y'] += 1
-  while adjusted['height'] + adjusted['y'] > original['height']:
-    adjusted['height'] -= 1
-
-  scaled = _get_scaled(pad, max_width, max_height)
-
-  result = {}
-
-  if original['width'] != adjusted['width'] or original['height'] != adjusted['height']:
-    result['crop'] = adjusted
-
-  if adjusted['width'] != pad['width'] or adjusted['height'] != pad['height']:
-    result['pad'] = pad
-
-  if scaled['width'] != pad['width'] or scaled['height'] != pad['height']:
+  size = copy(original)
+  if size['width'] != crop['width'] or size['height'] != crop['height']:
+    result['crop'] = crop
+    size = copy(crop)
+  if size['width'] != scaled['width'] or size['height'] != scaled['height']:
     result['scale'] = scaled
 
   return result
-
-  # do_crop = abs(original['width'] - crop['width']) > tolerance or abs(original['height'] - crop['height']) > tolerance
-  # result = {
-  #   'crop': crop if do_crop else original,
-  # }
-  # result['scale'] = _get_scaled(result['crop']['width'], result['crop']['height'], max_width, max_height)
-  #
-  #
-  #
-  #
-  # scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
-  #
-  # if max_width - match['width'] < tolerance && max_height - match['height'] < tolerance:
-  #
-  #
-  # added = 0
-  # while scaled['width'] % 8 > 0 and scaled['width'] < max_width and match['x'] > 0:
-  #   added += 1
-  #   match['width'] += 1
-  #   if added % 2 == 0:
-  #     match['x'] -= 1
-  #   scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
-  # added = 0
-  # while scaled['height'] % 8 > 0 and scaled['height'] < max_height and match['y'] > 0:
-  #   added += 1
-  #   match['height'] += 1
-  #   if added % 2 == 0:
-  #     match['y'] -= 1
-  #   scaled = _get_scaled(match['width'], match['height'], mw=max_width, mh=max_height)
-  # if scaled['width'] % 8 > 0 and scaled['width'] < max_width and match['x'] == 0:
-  #   scaled['pad'] = {'x': 0, 'y': 0, 'w': scaled['width'], 'h': scaled['height']}
-  #   while scaled['pad']['w'] % 8 > 0:
-  #     scaled['pad']['w'] += 1
-  #     if (scaled['pad']['w'] - scaled['width']) % 2 == 0:
-  #       scaled['pad']['x'] += 1
-  # if scaled['height'] % 8 > 0 and scaled['height'] < max_height and match['y'] == 0:
-  #   if not 'pad' in scaled:
-  #     scaled['pad'] = {'x': 0, 'y': 0, 'w': scaled['width'], 'h': scaled['height']}
-  #   while scaled['pad']['h'] % 8 > 0:
-  #     scaled['pad']['h'] += 1
-  #     if (scaled['pad']['h'] - scaled['height']) % 2 == 0:
-  #       scaled['pad']['y'] += 1
-  #
-  # return scaled
 
 class FfMpeg(object):
   def __init__(self, filepath, cleaner=None, ident=None):
@@ -293,7 +233,6 @@ class FfMpeg(object):
           deintmatches.extend(found)
     if crop:
       match = {k: int(v) for k,v in max(cropmatches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
-      self.log.debug('_fix_crop: original={:s} max_height={:d} crop={:s}'.format(json.dumps({'height': self.default_video_stream['height'], 'width': self.default_video_stream['width']}), max_height, json.dumps(match)))
       results = _fix_crop(self.default_video_stream, max_height=max_height, crop=match)
     else:
       results = _fix_crop(self.default_video_stream, max_height=max_height)
@@ -319,14 +258,9 @@ class FfMpeg(object):
         self.default_video_stream['_fieldorder'] = force_field_order
         self.log.info('Field order forced to: {:s}'.format(self.default_video_stream['_fieldorder']))
 
-    self.log.debug('Crop/pad/scale analysis result: {:s}'.format(json.dumps(results)))
-
     if 'crop' in results:
       self.log.info('Will crop to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(results['crop'])))
       self.default_video_stream['_crop'] = results['crop']
-    if 'pad' in results:
-      self.log.info('Will pad to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(results['pad'])))
-      self.default_video_stream['_pad'] = results['pad']
     if 'scale' in results:
       self.log.info('Will scale to {width:d}:{height:d}'.format(**(results['scale'])))
       self.default_video_stream['_scale'] = results['scale']
@@ -488,8 +422,6 @@ class FfMpeg(object):
         f.append('yadif=0:{:d}:1'.format(0 if self.default_video_stream['_fieldorder'] == 'TFF' else 1))
       if '_crop' in self.default_video_stream:
         f.append('crop={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_crop'])))
-      if '_pad' in self.default_video_stream:
-        f.append('pad={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_pad'])))
       if '_scale' in self.default_video_stream:
         f.append('scale={width:d}:{height:d}'.format(**(self.default_video_stream['_scale'])))
       if len(f) > 0:
