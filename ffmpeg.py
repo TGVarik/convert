@@ -65,7 +65,7 @@ def _get_scaled(dims, mw, mh):
 def _get_max_width(max_height):
   if max_height is None:
     return None
-  ret = math.floor(max_height * 16.0 / 9.0)
+  ret = math.ceil(max_height * 16.0 / 9.0)
   while (ret * 3.0 / 2.0) % 16 != 0:
     ret -= 1
   return ret
