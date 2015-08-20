@@ -66,14 +66,32 @@ def _get_max_width(max_height):
   if max_height is None:
     return None
   ret = math.ceil(max_height * 16.0 / 9.0)
-  while (ret * 3.0 / 2.0) % 16 != 0:
-    ret -= 1
+  if ret % 2 == 1:
+    ret += 1
+  err = (ret * 3 / 2) % 16
+  if err < 2:
+    pass
+  elif err < 5:
+    ret -= 2
+  elif err < 8:
+    ret -= 4
+  elif err == 8:
+    ret += 6
+  elif err < 12:
+    ret += 4
+  elif err < 15:
+    ret += 2
+  else:
+    pass
+
   return ret
 
 def _fix_crop(original, max_height, crop=None):
   result = {}
   if crop is None:
     crop = {'x': 0, 'y': 0, 'width': original['width'], 'height': original['height']}
+  if crop['width'] % 2 == 1:
+    crop['width'] += 1
   scaled = _get_scaled(crop, _get_max_width(max_height), max_height)
 
   size = copy(original)
