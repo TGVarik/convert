@@ -60,6 +60,10 @@ def _get_scaled(dims, mw, mh):
   else:
     ow = w
     oh = h
+  if ow % 2 == 1:
+    ow -= 1
+  if oh % 2 == 1:
+    oh -= 1
   return {'width': int(ow), 'height': int(oh)}
 
 def _get_max_width(max_height):

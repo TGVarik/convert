@@ -24,7 +24,7 @@ def blu_movies():
   for f in files:
     match = searcher.search(os.path.splitext(os.path.basename(f))[0])
     if match:
-      if match.group('tmdb_id') != '679':
+      if match.group('tmdb_id') != '1991':
         process_movie(f,
                     int(match.group('tmdb_id')),
                     collection=match.group('collection'),
