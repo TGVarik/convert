@@ -19,8 +19,8 @@ from config import config
 from datetime import datetime
 from requests.exceptions import Timeout
 from qtfaststart import processor as qt
-from collections import OrderedDict
 from copy import copy
+from scipy import spatial
 
 tvdb_api_key = config['tvdb']
 tmdb.API_KEY = config['tmdb']
@@ -60,35 +60,76 @@ def _get_scaled(dims, mw, mh):
   else:
     ow = w
     oh = h
-  if ow % 2 == 1:
-    ow -= 1
-  if oh % 2 == 1:
-    oh -= 1
   return {'width': int(ow), 'height': int(oh)}
 
 def _get_max_width(max_height):
-  if max_height is None:
-    return None
-  ret = math.ceil(max_height * 16.0 / 9.0)
-  if ret % 2 == 1:
-    ret += 1
-  err = (ret * 3 / 2) % 16
-  if err < 2:
-    pass
-  elif err < 5:
-    ret -= 2
-  elif err < 8:
-    ret -= 4
-  elif err == 8:
-    ret += 6
-  elif err < 12:
-    ret += 4
-  elif err < 15:
-    ret += 2
+  if max_height == 1080:
+    return 1920
+  elif max_height == 720:
+    return 1280
+  elif max_height == 480:
+    return 854
   else:
-    pass
+    return None
 
-  return ret
+def _get_delta(max_height):
+  if max_height == 1080:
+    return 6
+  elif max_height == 720:
+    return 22
+  elif max_height == 480:
+    return 46
+  else:
+    return None
+
+def _is_aligned(point, mw, mh):
+  scaled = _get_scaled(point, mw, mh)
+  return ((point['width'] * point['height'] * 3.0 / 2.0) % 16 == 0 and
+          (scaled['width'] * scaled['height'] * 3.0 / 2.0) % 16 == 0 and
+          point['width'] % 2 == 0 and point['height'] % 2 == 0 and
+          scaled['width'] % 2 == 0 and scaled['height'] % 2 == 0)
+
+
+def _new_fix_crop(original, max_height, crop=None):
+  if crop is None:
+    crop = {'x': 0, 'y': 0, 'width': original['width'], 'height': original['height']}
+
+  max_width = _get_max_width(max_height)
+  delta = _get_delta(max_height)
+
+  points = [{'width': w, 'height': h} for w in range(crop['width'], crop['width'] + delta + 1, 2) for h in range(crop['height'], crop['height'] + delta + 1, 2)]
+  fpoints = [pt for pt in points if _is_aligned(pt, max_width, max_height)]
+  tree = spatial.KDTree([[p['width'], p['height']] for p in fpoints])
+  res = tree.data[tree.query([crop['width'], crop['height']])[1]]
+
+  newcrop = {'x': crop['x'] - ((res[0] - crop['width']) / 2),
+             'y': crop['y'] - ((res[1] - crop['height']) / 2),
+             'width': res[0], 'height': res[1]}
+  newscale = _get_scaled(newcrop, max_width, max_height)
+  newpad = {'x': 0, 'y': 0, 'width': original['width'], 'height': original['height']}
+  while newcrop['x'] < 0:
+    newcrop['x'] += 4
+    newpad['x'] += 4
+    newpad['width'] += 4
+  while newcrop['y'] < 0:
+    newcrop['y'] += 2
+    newpad['y'] += 2
+    newpad['width'] += 2
+  while newcrop['width'] + newcrop['x'] > newpad['width']:
+    newpad['width'] += 4
+  while newcrop['height'] + newcrop['y'] > newpad['height']:
+    newpad['height'] += 4
+
+  result = {}
+  if newpad['x'] != 0 or newpad['y'] != 0 or newpad['width'] != original['width'] or newpad['height'] != original['height']:
+    result['pad'] = newpad
+  if newcrop['x'] != 0 or newcrop['y'] != 0 or newcrop['width'] != original['width'] or newcrop['height'] != original['height']:
+    result['crop'] = newcrop
+  if newscale['width'] != newcrop['width'] or newscale['height'] != newcrop['height']:
+    result['scale'] = newscale
+
+  return result
+
 
 def _fix_crop(original, max_height, crop=None):
   result = {}
@@ -210,7 +251,7 @@ class FfMpeg(object):
     if deint and force_field_order is None:
       filters.append('idet')
     if crop:
-      filters.append('cropdetect=24:1:0')
+      filters.append('cropdetect=24:2:0')
     if crop or (deint and force_field_order is None):
       n = int(math.floor(float(self.current_file_info['format']['duration']) / 240))
       if n > 1:
@@ -241,7 +282,7 @@ class FfMpeg(object):
                '-map', '0:{:d}'.format(self.default_video_stream['index']),
                '-an',
                '-sn',
-               '-vf:0', 'cropdetect=24:1:0',
+               '-vf:0', 'cropdetect=24:2:0',
                '-f', 'null',
                '-']
         self.log.debug(_command_to_string(cmd))
@@ -255,9 +296,9 @@ class FfMpeg(object):
           deintmatches.extend(found)
     if crop:
       match = {k: int(v) for k,v in max(cropmatches, key=lambda ma:(int(ma['width']), int(ma['height']))).items()}
-      results = _fix_crop(self.default_video_stream, max_height=max_height, crop=match)
+      results = _new_fix_crop(self.default_video_stream, max_height=max_height, crop=match)
     else:
-      results = _fix_crop(self.default_video_stream, max_height=max_height)
+      results = _new_fix_crop(self.default_video_stream, max_height=max_height)
 
     if deint:
       if force_field_order is None:
@@ -280,6 +321,9 @@ class FfMpeg(object):
         self.default_video_stream['_fieldorder'] = force_field_order
         self.log.info('Field order forced to: {:s}'.format(self.default_video_stream['_fieldorder']))
 
+    if 'pad' in results:
+      self.log.info('Will pad to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(results['pad'])))
+      self.default_video_stream['_pad'] = results['pad']
     if 'crop' in results:
       self.log.info('Will crop to {width:d}:{height:d}:{x:d}:{y:d}'.format(**(results['crop'])))
       self.default_video_stream['_crop'] = results['crop']
@@ -304,7 +348,7 @@ class FfMpeg(object):
     if allow_crop or deint or max_height is not None:
       self._analyze_crop_scale_deint(crop=allow_crop, max_height=max_height, deint=deint, force_field_order=force_field_order)
     vs = self.default_video_stream
-    if vs['codec_name'] != 'h264' or '_crop' in vs or '_scale' in vs or (deint and vs['_fieldorder'] in ['TFF', 'BFF']):
+    if vs['codec_name'] != 'h264' or '_pad' in vs or '_crop' in vs or '_scale' in vs or (deint and vs['_fieldorder'] in ['TFF', 'BFF']):
       vs['_convert'] = True
     else:
       vs['_convert'] = False
@@ -442,6 +486,8 @@ class FfMpeg(object):
       if '_fieldorder' in self.default_video_stream and self.default_video_stream['_fieldorder'] in ['TFF', 'BFF']:
         f.append('idet')
         f.append('yadif=0:{:d}:1'.format(0 if self.default_video_stream['_fieldorder'] == 'TFF' else 1))
+      if '_pad' in self.default_video_stream:
+        f.append('pad={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_pad'])))
       if '_crop' in self.default_video_stream:
         f.append('crop={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_crop'])))
       if '_scale' in self.default_video_stream:
