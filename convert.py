@@ -25,19 +25,19 @@ def blu_movies():
     match = searcher.search(os.path.splitext(os.path.basename(f))[0])
     if match:
       process_movie(f,
-                  int(match.group('tmdb_id')),
-                  collection=match.group('collection'),
-                  crop=True,
-                  keep_other_audio=True,
-                  max_height=1080,
-                  res_in_filename=True)
+                    int(match.group('tmdb_id')),
+                    collection=match.group('collection'),
+                    crop=True,
+                    keep_other_audio=True,
+                    max_height=1080,
+                    res_in_filename=True)
       process_movie(f,
-                  int(match.group('tmdb_id')),
-                  collection=match.group('collection'),
-                  crop=True,
-                  keep_other_audio=True,
-                  max_height=720,
-                  res_in_filename=True)
+                    int(match.group('tmdb_id')),
+                    collection=match.group('collection'),
+                    crop=True,
+                    keep_other_audio=True,
+                    max_height=720,
+                    res_in_filename=True)
       process_movie(f,
                     int(match.group('tmdb_id')),
                     collection=match.group('collection'),

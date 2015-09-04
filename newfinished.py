@@ -12,7 +12,7 @@ from shutil import move
 from datetime import datetime
 from logging import getLogger, LoggerAdapter
 from tvdb_api import Tvdb
-from ffmpeg import FfMpeg
+from ffmpeg import FfMpeg, get_file_version
 from timer import Timer
 from plex import refresh_plex
 from cleaning import Cleaner
@@ -32,7 +32,42 @@ def safeify(name):
     safe_name = safe_name[:-1]
   return safe_name
 
-def check_exists(folder, filename):
+temp_skip_list = [
+  '/tank/Plex/Movies/How to Train Your Dragon/How to Train Your Dragon 2 (2014)/How to Train Your Dragon 2 (2014).1080p.mp4',
+  '/tank/Plex/Movies/How to Train Your Dragon/How to Train Your Dragon 2 (2014)/How to Train Your Dragon 2 (2014).720p.mp4',
+  '/tank/Plex/Movies/How to Train Your Dragon/How to Train Your Dragon 2 (2014)/How to Train Your Dragon 2 (2014).480p.mp4',
+  '/tank/Plex/Movies/Harry Potter/Harry Potter and the Goblet of Fire (2005)/Harry Potter and the Goblet of Fire (2005).1080p.mp4',
+  '/tank/Plex/Movies/Harry Potter/Harry Potter and the Goblet of Fire (2005)/Harry Potter and the Goblet of Fire (2005).720p.mp4',
+  '/tank/Plex/Movies/Harry Potter/Harry Potter and the Goblet of Fire (2005)/Harry Potter and the Goblet of Fire (2005).480p.mp4',
+  '/tank/Plex/Movies/The Hunt for Red October (1990)/The Hunt for Red October (1990).1080p.mp4',
+  '/tank/Plex/Movies/The Hunt for Red October (1990)/The Hunt for Red October (1990).720p.mp4',
+  '/tank/Plex/Movies/The Hunt for Red October (1990)/The Hunt for Red October (1990).480p.mp4',
+  '/tank/Plex/Movies/Alien/Aliens (1986)/Aliens (1986).1080p.mp4',
+  '/tank/Plex/Movies/Alien/Aliens (1986)/Aliens (1986).720p.mp4',
+  '/tank/Plex/Movies/Alien/Aliens (1986)/Aliens (1986).480p.mp4',
+  '/tank/Plex/Movies/Stargate (1994)/Stargate (1994).1080p.mp4',
+  '/tank/Plex/Movies/Stargate (1994)/Stargate (1994).720p.mp4',
+  '/tank/Plex/Movies/Stargate (1994)/Stargate (1994).480p.mp4',
+  '/tank/Plex/Movies/Death Proof (2007)/Death Proof (2007).480p.mp4',
+  '/tank/Plex/Movies/Lord of the Rings/The Lord of the Rings The Two Towers (2002)/The Lord of the Rings The Two Towers (2002).1080p.mp4',
+  '/tank/Plex/Movies/Lord of the Rings/The Lord of the Rings The Two Towers (2002)/The Lord of the Rings The Two Towers (2002).720p.mp4',
+  '/tank/Plex/Movies/Lord of the Rings/The Lord of the Rings The Two Towers (2002)/The Lord of the Rings The Two Towers (2002).480p.mp4',
+  '/tank/Plex/Movies/Kill Bill/Kill Bill Vol. 2 (2004)/Kill Bill Vol. 2 (2004).1080p.mp4',
+  '/tank/Plex/Movies/Kill Bill/Kill Bill Vol. 2 (2004)/Kill Bill Vol. 2 (2004).720p.mp4',
+  '/tank/Plex/Movies/Kill Bill/Kill Bill Vol. 2 (2004)/Kill Bill Vol. 2 (2004).480p.mp4'
+]
+
+def check_exists(filepath, version):
+  if os.path.exists(filepath) and os.path.isfile(filepath):
+    exists_version = get_file_version(filepath)
+    if exists_version == version or filepath in temp_skip_list:
+      return 'skip'
+    else:
+      return 'replace'
+  else:
+    return False
+
+def replace_existing(folder, filename):
   if os.path.exists(os.path.join(folder, filename)) and os.path.isfile(os.path.join(folder, filename)):
     outerlog.debug('Destination file already exists!')
     if os.path.exists(os.path.join(oldmp4_folder, filename)):
@@ -67,6 +102,16 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
     else:
       destination_folder = os.path.join(plex_movie_section)
     destination_folder = os.path.join(destination_folder, '{:s} ({:d})'.format(title_safe, release.year))
+
+    if res_in_filename and max_height:
+      exists = check_exists(os.path.join(destination_folder, '{:s} ({:d}).{:d}p.mp4'.format(title_safe, release.year, max_height)), FfMpeg.version)
+    else:
+      exists = check_exists(os.path.join(destination_folder, '{:s} ({:d}).mp4'.format(title_safe, release.year)), FfMpeg.version)
+    if exists:
+      if exists == 'skip':
+        return
+
+
     with Cleaner('{:s}{:s}'.format(title, ' {:d}p'.format(max_height) if max_height is not None else ''), ident) as c:
       target = file_path
       with Timer('Processing', ident) as t:
@@ -96,7 +141,7 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
           out = n.current_file
           if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
-          check_exists(destination_folder, destination_filename)
+          replace_existing(destination_folder, destination_filename)
       c.timer_pushover(t)
       with Timer('Moving to Plex', ident):
         move(out, os.path.join(destination_folder, destination_filename))
@@ -128,7 +173,7 @@ def process_tv(file_path, show_id, season_number, episode_number, crop=False, ma
       log.info('Destination path: {:s}'.format(os.path.join(destination_folder, destination_filename)))
       if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
-      check_exists(destination_folder, destination_filename)
+      replace_existing(destination_folder, destination_filename)
       target = file_path
       with Timer('Processing', ident) as t:
         with FfMpeg(target, c, ident) as n:

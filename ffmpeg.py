@@ -25,6 +25,17 @@ from scipy import spatial
 tvdb_api_key = config['tvdb']
 tmdb.API_KEY = config['tmdb']
 
+def get_file_version(filepath):
+  if os.path.isfile(filepath):
+    cmd = ['AtomicParsley', filepath, '-t']
+    version_matcher = re.compile(r'Atom\suuid=0c5c9153-0bd4-5e72-be75-92dfec8ab00c\s\(AP uuid for "©inf"\)\scontains:\sFFver(?P<version>\d+\.\d+\.\d+)', re.I)
+    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    out, _ = p.communicate()
+    found = version_matcher.search(out.decode('latin-1'))
+    if found:
+      return found.groupdict()['version']
+  return None
+
 def _plist_to_string(root_object):
   return dumps(root_object).decode('utf-8')
 
@@ -89,7 +100,6 @@ def _is_aligned(point, mw, mh):
           point['width'] % 2 == 0 and point['height'] % 2 == 0 and
           scaled['width'] % 2 == 0 and scaled['height'] % 2 == 0)
 
-
 def _new_fix_crop(original, max_height, crop=None):
   if crop is None:
     crop = {'x': 0, 'y': 0, 'width': original['width'], 'height': original['height']}
@@ -130,7 +140,6 @@ def _new_fix_crop(original, max_height, crop=None):
 
   return result
 
-
 def _fix_crop(original, max_height, crop=None):
   result = {}
   if crop is None:
@@ -149,6 +158,7 @@ def _fix_crop(original, max_height, crop=None):
   return result
 
 class FfMpeg(object):
+  version = '0.1.0'
   def __init__(self, filepath, cleaner=None, ident=None):
     if os.path.exists(filepath) and os.path.isfile(filepath):
       self.in_file = filepath
@@ -685,6 +695,7 @@ class FfMpeg(object):
       urlretrieve(poster_path, cover_file)
       self.cleaner.add_path(cover_file)
       parsley['artwork'] = cover_file
+    parsley['information'] = 'zzzzFFVer' + FfMpeg.version
     self._garnish(parsley)
     return self
 
