@@ -61,9 +61,9 @@ def REtest(ch, tuplRE, flags = re.MULTILINE):
         print '\n  SUCCES . The regex integrally matches.'
 
 for x in li:
-    if x[0:5] == 'Atom':
+    if x[0:4] == 'Atom':
         print '  -*- Analyzed string :\n%r' % x
         REtest(x,tupleRE)
         print '\nmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwm'
     else:
-        print(x[0:5] + ' was not Atom')
+        print(x[0:4] + ' was not Atom')
