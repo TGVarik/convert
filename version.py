@@ -18,7 +18,7 @@ cmd = ['AtomicParsley', '/tank/Plex/Movies/Lord of the Rings/The Lord of the Rin
 p = Popen(cmd, stdout=PIPE, stderr=PIPE)
 out, _ = p.communicate()
 
-li = (n for n in out.decode('latin-1').split('\n') if n[0:5] == 'Atom')
+li = (n for n in out.decode('latin-1').split('\n'))
 
 tupleRE = ('Atom','\s','uuid=0c5c9153-0bd4-5e72-be75-92dfec8ab00c','\s','\(','AP','\s','uuid','\s','for','\s','\"','Â','©','inf','\"','\)','\s','contains:','\s','FFver','(?P<version>\d+\.\d+\.\d+)')
 
@@ -61,6 +61,9 @@ def REtest(ch, tuplRE, flags = re.MULTILINE):
         print '\n  SUCCES . The regex integrally matches.'
 
 for x in li:
-    print '  -*- Analyzed string :\n%r' % x
-    REtest(x,tupleRE)
-    print '\nmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwm'
+    if x[0:5] == 'Atom':
+        print '  -*- Analyzed string :\n%r' % x
+        REtest(x,tupleRE)
+        print '\nmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwmwm'
+    else:
+        print(x[0:5] + ' was not Atom')
