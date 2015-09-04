@@ -104,13 +104,15 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
     destination_folder = os.path.join(destination_folder, '{:s} ({:d})'.format(title_safe, release.year))
 
     if res_in_filename and max_height:
-      exists = check_exists(os.path.join(destination_folder, '{:s} ({:d}).{:d}p.mp4'.format(title_safe, release.year, max_height)), FfMpeg.version)
+      fn = os.path.join(destination_folder, '{:s} ({:d}).{:d}p.mp4'.format(title_safe, release.year, max_height))
     else:
-      exists = check_exists(os.path.join(destination_folder, '{:s} ({:d}).mp4'.format(title_safe, release.year)), FfMpeg.version)
+      fn = os.path.join(destination_folder, '{:s} ({:d}).mp4'.format(title_safe, release.year))
+    exists = check_exists(fn, FfMpeg.version)
+
     if exists:
       if exists == 'skip':
+        log.debug('skipping {:s}'.format(fn))
         return
-
 
     with Cleaner('{:s}{:s}'.format(title, ' {:d}p'.format(max_height) if max_height is not None else ''), ident) as c:
       target = file_path
