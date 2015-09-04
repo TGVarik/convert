@@ -20,7 +20,7 @@ out, _ = p.communicate()
 
 li = (n for n in out.decode('latin-1').split('\n'))
 
-tupleRE = ('Atom','\s','uuid=0c5c9153-0bd4-5e72-be75-92dfec8ab00c','\s','\(','AP','\s','uuid','\s','for','\s','\"','Â','©','inf','\"','\)','\s','contains:','\s','FFver','(?P<version>\d+\.\d+\.\d+)')
+tupleRE = ('Atom','\s','uuid=0c5c9153-0bd4-5e72-be75-92dfec8ab00c','\s','\(','AP','\s','uuid','\s','for','\s','\"','©','inf','\"','\)','\s','contains:','\s','FFver','(?P<version>\d+\.\d+\.\d+)')
 
 def REtest(ch, tuplRE, flags = re.MULTILINE):
     for n in xrange(len(tupleRE)):
