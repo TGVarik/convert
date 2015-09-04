@@ -13,7 +13,7 @@ from config import config
 from newfinished import process_movie, process_tv
 
 def blu_movies():
-  folder = '/tank/Incoming/'
+  folder = '/tank/Incoming'
   searcher = re.compile(
     r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)$')
   files = []
@@ -24,21 +24,20 @@ def blu_movies():
   for f in files:
     match = searcher.search(os.path.splitext(os.path.basename(f))[0])
     if match:
-      if match.group('tmdb_id') != '1991':
-        process_movie(f,
-                    int(match.group('tmdb_id')),
-                    collection=match.group('collection'),
-                    crop=True,
-                    keep_other_audio=True,
-                    max_height=1080,
-                    res_in_filename=True)
-        process_movie(f,
-                    int(match.group('tmdb_id')),
-                    collection=match.group('collection'),
-                    crop=True,
-                    keep_other_audio=True,
-                    max_height=720,
-                    res_in_filename=True)
+      process_movie(f,
+                  int(match.group('tmdb_id')),
+                  collection=match.group('collection'),
+                  crop=True,
+                  keep_other_audio=True,
+                  max_height=1080,
+                  res_in_filename=True)
+      process_movie(f,
+                  int(match.group('tmdb_id')),
+                  collection=match.group('collection'),
+                  crop=True,
+                  keep_other_audio=True,
+                  max_height=720,
+                  res_in_filename=True)
       process_movie(f,
                     int(match.group('tmdb_id')),
                     collection=match.group('collection'),
