@@ -18,7 +18,7 @@ cmd = ['AtomicParsley', '/tank/Plex/Movies/Lord of the Rings/The Lord of the Rin
 p = Popen(cmd, stdout=PIPE, stderr=PIPE)
 out, _ = p.communicate()
 
-li = (n for n in out.decode('latin-1').split('\n'))
+li = (n for n in out.decode('latin-1').split('\n') if n[0:5] == 'Atom')
 
 tupleRE = ('Atom','\s','uuid=0c5c9153-0bd4-5e72-be75-92dfec8ab00c','\s','\(','AP','\s','uuid','\s','for','\s','\"','Â','©','inf','\"','\)','\s','contains:','\s','FFver','(?P<version>\d+\.\d+\.\d+)')
 
