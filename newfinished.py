@@ -121,7 +121,7 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
           if not tag_only:
             with Timer('Analyzing', ident):
               n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=max_height, deint=deint, force_field_order=force_field_order)
-          height = n.default_video_stream['_scale']['height'] if '_scale' in n.default_video_stream else (n.default_video_stream['_pad']['_height'] if '_pad' in n.default_video_stream else (n.default_video_stream['_crop']['height'] if '_crop' in n.default_video_stream else (n.default_video_stream['height'])))
+          height = n.default_video_stream['_scale']['height'] if '_scale' in n.default_video_stream else (n.default_video_stream['_crop']['height'] if '_crop' in n.default_video_stream else (n.default_video_stream['height']))
           height = min(height, max_height)
           res = '1080p' if height > 720 else ('720p' if height > 480 else '480p')
           if special_feature_title is not None and special_feature_type is not None:
