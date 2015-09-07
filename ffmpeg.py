@@ -158,7 +158,7 @@ def _fix_crop(original, max_height, crop=None):
   return result
 
 class FfMpeg(object):
-  version = '0.1.0'
+  version = '0.1.1'
   def __init__(self, filepath, cleaner=None, ident=None):
     if os.path.exists(filepath) and os.path.isfile(filepath):
       self.in_file = filepath
@@ -504,7 +504,7 @@ class FfMpeg(object):
         f.append('scale={width:d}:{height:d}'.format(**(self.default_video_stream['_scale'])))
       if len(f) > 0:
         filters.extend(['-filter:v:0', ','.join(f)])
-      converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '22'])
+      converts.extend(['-c:v:0', 'libx264', '-preset:v:0', 'fast', '-crf:v:0', '21'])
     else:
       converts.extend(['-c:v:0', 'copy'])
     ### Audio

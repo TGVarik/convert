@@ -12,8 +12,7 @@ import tmdbsimple as tmdb
 from config import config
 from newfinished import process_movie, process_tv
 
-def blu_movies():
-  folder = '/tank/Incoming'
+def blu_movies(folder):
   searcher = re.compile(
     r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)$')
   files = []
@@ -21,6 +20,7 @@ def blu_movies():
     files.extend([os.path.join(root, f) for f in fs if
                   os.path.splitext(f)[1].lower() in ['.mkv', '.mp4', '.avi']])
   print('{:d} files found.'.format(len(files)))
+
   for f in files:
     match = searcher.search(os.path.splitext(os.path.basename(f))[0])
     if match:
@@ -127,4 +127,5 @@ if __name__ == '__main__':
 
   setup_logging('convert')
   log = getLogger()
-  blu_movies()
+  blu_movies('/tank/Incoming/Cloud_Atlas')
+  blu_movies('/tank/Incoming')
