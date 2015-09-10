@@ -17,7 +17,7 @@ def series(folder, tvdb_id):
   for root, dirs, fs in os.walk(folder):
     files.extend([os.path.join(root, f) for f in fs if
                   os.path.splitext(f)[1].lower() in ['.mkv', '.mp4', '.avi'] and
-                  searcher.search(os.path.basename(f) is not None)])
+                  searcher.search(os.path.basename(f)) is not None])
   print('{:d} files found.'.format(len(files)))
 
   for f in sorted(files, key=lambda f: (int(searcher.search(os.path.basename(f)).group('season')), int(searcher.search(os.path.basename(f)).group('episode')))):
