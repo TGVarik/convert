@@ -4,6 +4,10 @@ import os
 from newfinished import process_tv
 from shutil import move
 
+@click.group()
+def cli():
+  pass
+
 @click.command()
 @click.argument('folder', type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True))
 @click.argument('tvdb_id', type=click.INT)
@@ -27,3 +31,8 @@ def series(folder, tvdb_id):
                  deint=False,
                  max_height=1080)
       move(f, f + '.done')
+
+cli.add_command(series)
+
+if __name__ == '__main__':
+  cli()
