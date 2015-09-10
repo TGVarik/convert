@@ -3,6 +3,9 @@ import re
 import os
 from newfinished import process_tv
 from shutil import move
+from config import config
+import tmdbsimple as tmdb
+from logging import getLogger
 
 @click.group()
 def cli():
@@ -35,4 +38,9 @@ def series(folder, tvdb_id):
 cli.add_command(series)
 
 if __name__ == '__main__':
+  tmdb.API_KEY = config['tmdb']
+  from logs import setup_logging
+
+  setup_logging('convert')
+  log = getLogger()
   cli()
