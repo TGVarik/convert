@@ -41,6 +41,6 @@ if __name__ == '__main__':
   tmdb.API_KEY = config['tmdb']
   from logs import setup_logging
 
-  setup_logging('convert')
+  setup_logging('cli')
   log = getLogger()
   cli()
