@@ -25,6 +25,14 @@ from scipy import spatial
 tvdb_api_key = config['tvdb']
 tmdb.API_KEY = config['tmdb']
 
+def get_ffprobe(filepath):
+  cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filepath]
+  proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+  out, err = proc.communicate()
+  if err:
+    raise Exception(err.decode())
+  return _all_keys_to_lowercase(json.loads(out))
+
 def get_file_version(filepath):
   if os.path.isfile(filepath):
     cmd = ['AtomicParsley', filepath, '-t']
@@ -201,12 +209,7 @@ class FfMpeg(object):
           self.current_file_ext = ext.lstrip('.')
           self.current_file_basename = root
           self.log.debug('Setting current file to \'{:s}\''.format(self.current_file))
-          cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', self.current_file]
-          proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
-          out, err = proc.communicate()
-          if err:
-            raise Exception(err.decode())
-          self.current_file_info = _all_keys_to_lowercase(json.loads(out))
+          self.current_file_info = get_ffprobe(self.current_file)
           self.video_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'video' and s['codec_name'] != 'mjpeg'], key=lambda st: st['index'])
           self.audio_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'audio'], key=lambda st: st['index'])
           self.subtitle_streams = sorted([s for s in self.current_file_info['streams'] if s['codec_type'] == 'subtitle'], key=lambda st: st['index'])

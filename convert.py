@@ -6,6 +6,7 @@ import re
 import os
 from shutil import move
 from logging import getLogger
+from ffmpeg import get_ffprobe
 
 import tmdbsimple as tmdb
 
@@ -25,20 +26,24 @@ def blu_movies(folder):
   for f in sorted(files, key=lambda f: int(searcher.search(os.path.splitext(os.path.basename(f))[0]).group('tmdb_id'))):
     match = searcher.search(os.path.splitext(os.path.basename(f))[0])
     if match:
-      process_movie(f,
-                    int(match.group('tmdb_id')),
-                    collection=match.group('collection'),
-                    crop=True,
-                    keep_other_audio=True,
-                    max_height=1080,
-                    res_in_filename=True)
-      process_movie(f,
-                    int(match.group('tmdb_id')),
-                    collection=match.group('collection'),
-                    crop=True,
-                    keep_other_audio=True,
-                    max_height=720,
-                    res_in_filename=True)
+      ffprobe = get_ffprobe(f)
+      video = [s for s in ffprobe.streams if s['codec_type'] == 'video'][0]
+      if video['height'] > 720:
+        process_movie(f,
+                      int(match.group('tmdb_id')),
+                      collection=match.group('collection'),
+                      crop=True,
+                      keep_other_audio=True,
+                      max_height=1080,
+                      res_in_filename=True)
+      if video['height'] > 480:
+        process_movie(f,
+                      int(match.group('tmdb_id')),
+                      collection=match.group('collection'),
+                      crop=True,
+                      keep_other_audio=True,
+                      max_height=720,
+                      res_in_filename=True)
       process_movie(f,
                     int(match.group('tmdb_id')),
                     collection=match.group('collection'),
