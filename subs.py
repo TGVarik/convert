@@ -10,7 +10,7 @@ for f in files:
   ffprobe = get_ffprobe(f)
   sub_streams = [s for s in ffprobe['streams'] if s['codec_type'] == 'subtitle' and s['codec_name'] in ['pgssub', 'dvdsub']]
   if len(sub_streams) > 0:
-    cmd = ['ffmpeg', '-hide_banner', '-stats', '-y', '-i', f]
+    cmd = ['ffmpeg', '-hide_banner', '-stats', '-y', '-v', 'quiet', '-i', f]
     maps = []
     codecs = []
     sub_index = -1
