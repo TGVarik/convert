@@ -606,6 +606,9 @@ class FfMpeg(object):
     for key, value in parsley.items():
       if key == 'rDNSatom':
         cmd.extend(['--{:s}'.format(key), value['value'], 'name={:s}'.format(value['name']), 'domain={:s}'.format(value['domain'])])
+      elif key == 'sortOrder':
+        cmd.append('--{:s}'.format(key))
+        cmd.extend([unicode(v) for v in value])
       else:
         cmd.extend(['--{:s}'.format(key), unicode(value)])
     self.log.debug(_command_to_string(cmd))
@@ -675,7 +678,7 @@ class FfMpeg(object):
     if collection is not None:
       parsley['album'] = collection
       if release_date is not None:
-        parsley['sortOrder'] = 'name "{:s} {:d}"'.format(collection, release_date.year)
+        parsley['sortOrder'] = ['name', '{:s} {:d}'.format(collection, release_date.year)]
     if 'genres' in info and len(info['genres']) > 0:
       parsley['genre'] = _join_and_ellipsize([g['name'] for g in info['genres'] if g['name'] != ''], ', ', 255, '')
     if release_date is not None:
