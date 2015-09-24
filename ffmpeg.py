@@ -610,6 +610,7 @@ class FfMpeg(object):
     return self
 
   def _garnish(self, parsley):
+    parsley['information'] = 'zzzzFFVer{video:d}.{audio:d}.{tags:d}'.format(**(FfMpeg.version))
     tagged_file = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'tagged', self.current_file_ext]))
     cmd = ['AtomicParsley', self.current_file, '--metaEnema', '--output', tagged_file]
     for key, value in parsley.items():
@@ -710,7 +711,6 @@ class FfMpeg(object):
       urlretrieve(poster_path, cover_file)
       self.cleaner.add_path(cover_file)
       parsley['artwork'] = cover_file
-    parsley['information'] = 'zzzzFFVer' + FfMpeg.version
     self._garnish(parsley)
     return self
 
