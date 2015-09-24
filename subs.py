@@ -26,7 +26,7 @@ for f in files:
       cmd.extend(maps)
       cmd.extend(codecs)
       cmd.extend(['-f', 'matroska', outfile])
-      print(_command_to_string(cmd).encode('latin-1'))
+      print(_command_to_string(cmd))
       p = call(cmd)
       if p != 0:
         raise IOError('Failure with exit code: {:d}'.format(p))
