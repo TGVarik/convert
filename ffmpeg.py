@@ -41,7 +41,12 @@ def get_file_version(filepath):
     out, _ = p.communicate()
     found = version_matcher.search(out.decode('latin-1'))
     if found:
-      return found.groupdict()['version']
+      parts = found.groupdict()['version'].split('.')
+      return {
+        'video': int(parts[0]),
+        'audio': int(parts[1]),
+        'tags' : int(parts[2])
+      }
   return None
 
 def _plist_to_string(root_object):
@@ -166,7 +171,11 @@ def _fix_crop(original, max_height, crop=None):
   return result
 
 class FfMpeg(object):
-  version = '0.1.1'
+  version = {
+    'video': 0,
+    'audio': 1,
+    'tags' : 1
+  }
   def __init__(self, filepath, cleaner=None, ident=None):
     if os.path.exists(filepath) and os.path.isfile(filepath):
       self.in_file = filepath

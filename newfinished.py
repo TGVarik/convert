@@ -59,11 +59,18 @@ temp_skip_list = [
 
 def check_exists(filepath, version):
   if os.path.exists(filepath) and os.path.isfile(filepath):
-    exists_version = get_file_version(filepath)
-    if exists_version == version or filepath in temp_skip_list:
+    if filepath in temp_skip_list:
       return 'skip'
-    else:
+    exists_version = get_file_version(filepath)
+    if exists_version['video'] != version['video']:
       return 'replace'
+    if exists_version['audio'] != version['audio']:
+      # return 'audio'
+      return 'replace'
+    if exists_version['tags'] != version['tags']:
+      # return 'retag'
+      return 'replace'
+    return 'skip'
   else:
     return False
 
@@ -122,8 +129,8 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
             with Timer('Analyzing', ident):
               n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=max_height, deint=deint, force_field_order=force_field_order)
           height = n.default_video_stream['_scale']['height'] if '_scale' in n.default_video_stream else (n.default_video_stream['_crop']['height'] if '_crop' in n.default_video_stream else (n.default_video_stream['height']))
-          height = min(height, max_height)
-          res = '1080p' if height > 720 else ('720p' if height > 480 else '480p')
+          width  = n.default_video_stream['_scale']['width']  if '_scale' in n.default_video_stream else (n.default_video_stream['_crop']['width']  if '_crop' in n.default_video_stream else (n.default_video_stream['width']))
+          res = '1080p' if height > 720 or width > 1280 else ('720p' if height > 480 or width > 854 else '480p')
           if special_feature_title is not None and special_feature_type is not None:
             destination_filename = '{:s}-{:s}.mp4'.format(special_feature_title,special_feature_type)
           else:
