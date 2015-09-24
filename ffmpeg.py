@@ -55,7 +55,7 @@ def _plist_to_string(root_object):
 def _command_to_string(command):
   if not isinstance(command, list):
     raise Exception('command_to_string takes a list, not a {:s}!'.format(type(command).__name__))
-  l = ["'{:s}'".format(s) if ' ' in s else s for s in command]
+  l = ["'{:s}'".format(s.decode('latin-1')) if ' ' in s else s.decode('latin-1') for s in command]
   result = re.sub('[\n\t]+', '', ' '.join(l))
   return result
 
