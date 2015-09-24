@@ -27,7 +27,7 @@ def blu_movies(folder):
     match = searcher.search(os.path.splitext(os.path.basename(f))[0])
     if match:
       ffprobe = get_ffprobe(f)
-      video = [s for s in ffprobe.streams if s['codec_type'] == 'video'][0]
+      video = [s for s in ffprobe['streams'] if s['codec_type'] == 'video'][0]
       if video['height'] > 720:
         process_movie(f,
                       int(match.group('tmdb_id')),
@@ -133,4 +133,5 @@ if __name__ == '__main__':
 
   setup_logging('convert')
   log = getLogger()
+  blu_movies('/tank/Incoming/priority')
   blu_movies('/tank/Incoming')
