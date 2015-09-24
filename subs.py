@@ -9,7 +9,7 @@ for root, dirs, fs in os.walk('/tank/Incoming'):
 for f in files:
   print(f);
   ffprobe = get_ffprobe(f)
-  sub_streams = [s for s in ffprobe['streams'] if s['codec_type'] == 'subtitle' and s['codec_name'] in ['pgssub', 'dvdsub']]
+  sub_streams = [s for s in ffprobe['streams'] if s['codec_type'] == 'subtitle' and 'codec_name' in s and s['codec_name'] in ['pgssub', 'dvdsub']]
   if len(sub_streams) > 0:
     cmd = ['ffmpeg', '-hide_banner', '-y', '-v', 'quiet', '-i', f]
     maps = []
