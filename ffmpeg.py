@@ -55,8 +55,8 @@ def _plist_to_string(root_object):
 def _command_to_string(command):
   if not isinstance(command, list):
     raise Exception('command_to_string takes a list, not a {:s}!'.format(type(command).__name__))
-  l = ["'{:s}'".format(s) if ' ' in s else s for s in [s.decode('utf-8') for s in command]]
-  result = re.sub('[\n\t]+', '', ' '.join(l))
+  l = [u"'{:s}'".format(s) if u' ' in s else s for s in [s for s in command]]
+  result = re.sub(r'[\n\t]+', u'', u' '.join(l))
   return result
 
 def _all_keys_to_lowercase(d):
