@@ -242,7 +242,8 @@ class FfMpeg(object):
       self.needs_aac_to_ac3_conversion = True
     default['_default'] = True
     default['_measure'] = True
-    default['_copy'] = False if default['codec_name'] in ['aac', 'libfdk_aac'] and default['channels'] > 2 else True
+    default['_copy'] = False if (default['codec_name'] in ['aac', 'libfdk_aac'] and default['channels'] > 2) \
+                                or (default['codec_name'] not in ['dca', 'ac3', 'libfdk_aac', 'aac']) else True
     default['_convert'] = False if default['codec_name'] in ['aac', 'libfdk_aac'] and default['channels'] <= 2 else True
     self.default_audio_stream = default
     for stream in self.audio_streams:
