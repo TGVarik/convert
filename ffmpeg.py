@@ -36,10 +36,10 @@ def get_ffprobe(filepath):
 def get_file_version(filepath):
   if os.path.isfile(filepath):
     cmd = ['AtomicParsley', filepath, '-t']
-    version_matcher = re.compile('Atom\suuid=0c5c9153-0bd4-5e72-be75-92dfec8ab00c\s\(AP\suuid\sfor\s\"©inf\"\)\scontains:\sFFver(?P<version>\d+\.\d+\.\d+)', re.I)
+    version_matcher = re.compile('Atom\suuid=0c5c9153-0bd4-5e72-be75-92dfec8ab00c\s\(AP\suuid\sfor\s\"©inf\"\)\scontains:\sFFVer(?P<version>\d+\.\d+\.\d+)', re.I)
     p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     out, _ = p.communicate()
-    found = version_matcher.search(out.decode('latin-1'))
+    found = version_matcher.search(out.decode('utf-8'))
     if found:
       parts = found.groupdict()['version'].split('.')
       return {
