@@ -15,7 +15,7 @@ from newfinished import process_movie, process_tv
 
 def blu_movies(folder):
   searcher = re.compile(
-    r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)$')
+    r'^(?P<tmdb_id>\d+)\s?-(\[(?P<collection>[^\]]+)\]\s*)?(?P<title>.+?)$')
   files = []
   for root, dirs, fs in os.walk(folder):
     files.extend([os.path.join(root, f) for f in fs if
@@ -58,7 +58,7 @@ def blu_movies(folder):
 def main_movies():
   folder = '/tank/Incoming/'
   searcher = re.compile(
-    r'^(\[(?P<collection>[^\]]+)\]\s*)?(?P<tmdb_id>\d+)\s?-(?P<title>.+?)(-(?P<feature_type>behindthescenes|deleted|interview|scene|trailer))?$')
+    r'^(?P<tmdb_id>\d+)\s?-(\[(?P<collection>[^\]]+)\]\s*)?(?P<title>.+?)(-(?P<feature_type>behindthescenes|deleted|interview|scene|trailer))?$')
   files = []
   for root, dirs, fs in os.walk(folder):
     files.extend([os.path.join(root, f) for f in fs if

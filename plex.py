@@ -8,7 +8,7 @@ else:
 from xml.dom import minidom
 from config import config
 
-def refresh_plex(host='acromantula', source_type='show'):
+def refresh_plex(host='atlas', source_type='show'):
   log = getLogger()
   log.debug('Refreshing Plex...')
   base_url = 'http://{:s}:32400/library/sections'.format(host)
