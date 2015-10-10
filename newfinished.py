@@ -62,6 +62,8 @@ def check_exists(filepath, version):
     if filepath in temp_skip_list:
       return 'skip'
     exists_version = get_file_version(filepath)
+    if exists_version is None:
+      return 'replace'
     if exists_version['video'] != version['video']:
       return 'replace'
     if exists_version['audio'] != version['audio']:
