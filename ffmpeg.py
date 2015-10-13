@@ -610,9 +610,21 @@ class FfMpeg(object):
     dest = os.path.join(self.cleaner.temp_dir, '.'.join([self.current_file_basename, 'norm', 'mp4']))
     cmd.extend(['-f', 'mp4', dest])
     self.log.debug(_command_to_string(cmd))
-    p = call(cmd)
-    if p != 0:
-      raise IOError('Normalization failed with exit code {:d}'.format(p))
+    if '|' in cmd:
+      a = cmd[:cmd.index('|')]
+      b = cmd[cmd.index('|') + 1:]
+      pa = Popen(a, stdout=PIPE, stderr=PIPE)
+      pb = Popen(b, stdin=pa.stdout, stdout=PIPE, stderr=PIPE)
+      _, err = pb.communicate()
+      rc = pb.returncode
+    else:
+      p = Popen(cmd, stdout=PIPE, stderr=PIPE)
+      _, err = p.communicate()
+      rc = p.returncode
+    if rc != 0:
+      with open('faillog.log', 'w') as f:
+        f.write(err)
+      raise IOError('Normalization failed with exit code {:d}'.format(rc))
     self.cleaner.add_path(dest)
     self._refresh(dest)
     return self
