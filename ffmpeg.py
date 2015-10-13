@@ -443,8 +443,15 @@ class FfMpeg(object):
     cmd.extend(filters)
     cmd.extend(['-f', 'null', '-'])
     self.log.debug(_command_to_string(cmd))
-    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-    _, err = p.communicate()
+    if '|' in cmd:
+      a = cmd[:cmd.index('|')]
+      b = cmd[cmd.index('|') + 1:]
+      pa = Popen(a, stdout=PIPE, stderr=PIPE)
+      pb = Popen(b, stdin=pa.stdout, stdout=PIPE, stderr=PIPE)
+      _, err = pb.communicate()
+    else:
+      p = Popen(cmd, stdout=PIPE, stderr=PIPE)
+      _, err = p.communicate()
     output = err.decode('latin-1')
     summary_finder = re.compile(r'\[Parsed_ebur128_\d\s@\s0x(?P<position>[\da-f]{1,16})\]\sSummary:\s+Integrated\sloudness:\s+I:\s+(?P<loudness>-?\d\d.\d)\sLUFS')
     matches = [m for m in summary_finder.finditer(output)]
