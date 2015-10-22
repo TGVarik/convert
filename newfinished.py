@@ -159,7 +159,7 @@ def process_movie(file_path, tmdb_id, collection=None, special_feature_title=Non
     log.info('Processing complete')
     refresh_plex(source_type='movie')
 
-def process_tv(file_path, show_id, season_number, episode_number, crop=False, max_height=720.0, keep_other_audio=False, deint=False, tag_only=False, add_filters=None):
+def process_tv(file_path, show_id, season_number, episode_number, crop=False, max_height=720.0, keep_other_audio=False, deint=False, force_field_order=None, tag_only=False, add_filters=None):
   ident = '{:06d}:{:02d}:{:03d}'.format(show_id, season_number, episode_number)
   log = LoggerAdapter(getLogger(), {'identifier': ident})
   if os.path.splitext(file_path)[1].lower() in ['.mkv', '.mp4', '.avi']:
@@ -190,7 +190,7 @@ def process_tv(file_path, show_id, season_number, episode_number, crop=False, ma
         with FfMpeg(target, c, ident) as n:
           if not tag_only:
             with Timer('Analyzing', ident):
-              n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=max_height, deint=deint)
+              n.analyze(allow_crop=crop, keep_other_audio=keep_other_audio, max_height=max_height, deint=deint, force_field_order=force_field_order)
             with Timer('Converting', ident):
               n.convert_and_normalize(add_filters=add_filters)
           with Timer('Tagging', ident):
