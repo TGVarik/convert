@@ -333,6 +333,8 @@ class FfMpeg(object):
         }
         totalframes = float(sum(deint_data.values()))
         detectedframes = float(sum([v for k,v in deint_data.items() if k != 'Undetermined']))
+        self.log.debug('TFF: {TFF:d} BFF: {BFF:d} Progressive: {Progressive:d} Undetermined: {Undetermined:d}'.format(**deint_data))
+        self.log.debug('totalframes: {:d} detectedframes: {:d}'.format(totalframes, detectedframes))
         deint_data = {k: [float(v) / totalframes, float(v)/detectedframes] for k, v in deint_data.items()}
         fieldorder, pct = max(deint_data.items(), key=lambda x:x[1][0])
         if fieldorder in ['TFF', 'BFF', 'Progressive'] and pct[0] >= 0.75 and pct[1] >= 0.95:
