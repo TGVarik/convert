@@ -133,5 +133,5 @@ if __name__ == '__main__':
 
   setup_logging('convert')
   log = getLogger()
-  blu_movies('/tank/Incoming/priority')
-  blu_movies('/tank/Incoming')
+  blu_movies('/tank/incoming/movies/priority')
+  blu_movies('/tank/incoming/movies')
