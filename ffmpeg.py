@@ -277,7 +277,7 @@ class FfMpeg(object):
       filters.append('cropdetect=24:2:0')
     if crop or (deint and force_field_order is None):
       n = int(math.floor(float(self.current_file_info['format']['duration']) / 240))
-      if n > 1:
+      if n > 1 and not deint:
         for i in range(1,n):
           cmd = ['ffmpeg',
                  '-hide_banner',
