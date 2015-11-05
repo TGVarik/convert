@@ -293,8 +293,9 @@ class FfMpeg(object):
           self.log.debug(_command_to_string(cmd))
           p = Popen(cmd, stdout=PIPE, stderr=PIPE)
           _, err = p.communicate()
-          found = [m.groupdict() for m in rcrop.finditer(err.decode('latin-1'))]
-          cropmatches.extend(found)
+          if crop:
+            found = [m.groupdict() for m in rcrop.finditer(err.decode('latin-1'))]
+            cropmatches.extend(found)
           if deint:
             found = [m.groupdict() for m in rdeint.finditer(err.decode('latin-1'))]
             deintmatches.extend(found)
@@ -305,7 +306,7 @@ class FfMpeg(object):
                '-map', '0:{:d}'.format(self.default_video_stream['index']),
                '-an',
                '-sn',
-               '-vf:0', 'cropdetect=24:2:0',
+               '-vf:0', ','.join(filters),
                '-f', 'null',
                '-']
         self.log.debug(_command_to_string(cmd))

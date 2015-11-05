@@ -33,6 +33,7 @@ def blu_movies(folder):
                       int(match.group('tmdb_id')),
                       collection=match.group('collection'),
                       crop=True,
+                      deint=True,
                       keep_other_audio=True,
                       max_height=1080,
                       res_in_filename=True)
@@ -41,6 +42,7 @@ def blu_movies(folder):
                       int(match.group('tmdb_id')),
                       collection=match.group('collection'),
                       crop=True,
+                      deint=True,
                       keep_other_audio=True,
                       max_height=720,
                       res_in_filename=True)
