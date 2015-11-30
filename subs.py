@@ -3,11 +3,11 @@ from subprocess import call
 from ffmpeg import get_ffprobe, _command_to_string
 
 files = []
-for root, dirs, fs in os.walk('/tank/Incoming'):
+for root, dirs, fs in os.walk('/tank/incoming/movies'):
   files.extend([os.path.join(root, f) for f in fs if
                 os.path.splitext(f)[1].lower() in ['.mkv', '.done']])
 for f in files:
-  print(f);
+  print(f)
   ffprobe = get_ffprobe(f)
   sub_streams = [s for s in ffprobe['streams'] if s['codec_type'] == 'subtitle' and 'codec_name' in s and s['codec_name'] in ['pgssub', 'dvdsub']]
   if len(sub_streams) > 0:
@@ -27,7 +27,7 @@ for f in files:
       cmd.extend(maps)
       cmd.extend(codecs)
       cmd.extend(['-f', 'matroska', outfile])
-      print(_command_to_string(cmd))
+      print(_command_to_string([c.decode('latin-1') for c in cmd]))
       p = call(cmd)
       if p != 0:
         raise IOError('Failure with exit code: {:d}'.format(p))
