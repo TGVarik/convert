@@ -31,7 +31,7 @@ def series(folder, tvdb_id):
                  int(match.group('season')),
                  int(match.group('episode')),
                  crop=True,
-                 deint=False,
+                 deint=True,
                  max_height=1080)
       move(f, f + '.done')
 
