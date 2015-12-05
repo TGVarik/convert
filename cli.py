@@ -31,9 +31,24 @@ def series(folder, tvdb_id):
                  int(match.group('season')),
                  int(match.group('episode')),
                  crop=True,
-                 deint=False,
+                 deint=True,
                  max_height=1080)
       move(f, f + '.done')
+
+@click.command()
+@click.argument('file', type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True))
+@click.argument('tvdb_id', type=click.INT)
+@click.argument('season', type=click.INT)
+@click.argument('episode', type=click.INT)
+def episode(file, tvdb_id, season, episode):
+  process_tv(file,
+             tvdb_id,
+             season,
+             episode,
+             crop=True,
+             deint=True,
+             max_height=1080)
+  move(file, file + '.done')
 
 cli.add_command(series)
 
