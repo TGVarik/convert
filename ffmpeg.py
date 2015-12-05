@@ -518,7 +518,7 @@ class FfMpeg(object):
         f.extend(add_filters)
       if '_fieldorder' in self.default_video_stream and self.default_video_stream['_fieldorder'] in ['TFF', 'BFF']:
         f.append('idet')
-        f.append('yadif=0:{:d}:1'.format(0 if self.default_video_stream['_fieldorder'] == 'TFF' else 1))
+        f.append('yadif=0:{:d}:0'.format(0 if self.default_video_stream['_fieldorder'] == 'TFF' else 1))
       if '_pad' in self.default_video_stream:
         f.append('pad={width:d}:{height:d}:{x:d}:{y:d}'.format(**(self.default_video_stream['_pad'])))
       if '_crop' in self.default_video_stream:
