@@ -51,6 +51,7 @@ def episode(file, tvdb_id, season, episode):
   move(file, file + '.done')
 
 cli.add_command(series)
+cli.add_command(episode)
 
 if __name__ == '__main__':
   tmdb.API_KEY = config['tmdb']
