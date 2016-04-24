@@ -12,9 +12,10 @@ def cli():
   pass
 
 @click.command()
+@click.option('--tag-only', is_flag=True)
 @click.argument('folder', type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True))
 @click.argument('tvdb_id', type=click.INT)
-def series(folder, tvdb_id):
+def series(tag_only, folder, tvdb_id):
   searcher = re.compile(r's(?P<season>\d\d?)e(?P<episode>\d\d)', re.I)
   files = []
   for root, dirs, fs in os.walk(folder):
@@ -32,7 +33,8 @@ def series(folder, tvdb_id):
                  int(match.group('episode')),
                  crop=True,
                  deint=True,
-                 max_height=1080)
+                 max_height=1080,
+                 tag_only=tag_only)
       move(f, f + '.done')
 
 @click.command()
